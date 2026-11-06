@@ -1,0 +1,26 @@
+{
+  "name": "velberry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Velberry — handmade clay keychain boutique (storefront, checkout, admin)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning server/db/seed.js",
+    "create-admin": "node --disable-warning=ExperimentalWarning scripts/create-admin.js",
+    "db:migrate": "node --disable-warning=ExperimentalWarning scripts/db-migrate.js",
+    "setup-storage": "node --disable-warning=ExperimentalWarning scripts/setup-storage.js",
+    "migrate:sqlite": "node --disable-warning=ExperimentalWarning scripts/migrate-sqlite-to-supabase.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "vercel-build": "node --disable-warning=ExperimentalWarning scripts/vercel-build.js"
+  },
+  "dependencies": {
+    "express": "5.1.0",
+    "pg": "^8.13.1",
+    "three": "0.170.0"
+  }
+}

@@ -1,0 +1,41 @@
+# Optional, free, more frequent scheduler for Velberry's jobs (Vercel Hobby only allows one cron run per day).
+#
+# Does nothing until you add two repository secrets (GitHub → Settings → Secrets and variables → Actions):
+#   VELBERRY_URL  the live shop address, e.g. https://www.example.com  (no trailing slash)
+#   CRON_SECRET   the same value as CRON_SECRET in Vercel
+#
+# GitHub runs scheduled workflows on a best-effort basis (often 5–15 minutes late, sometimes skipped at busy
+# times) and pauses them after 60 days without repository activity. The daily Vercel Cron and the
+# release-on-checkout check keep working regardless.
+name: Scheduled jobs
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes: release expired checkouts
+    - cron: '17 * * * *'     # hourly: Shiprocket tracking sync
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the job endpoint
+        env:
+          VELBERRY_URL: ${{ secrets.VELBERRY_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ -z "$VELBERRY_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "VELBERRY_URL / CRON_SECRET secrets not set — skipping."
+            exit 0
+          fi
+          case "$SCHEDULE" in
+            '17 * * * *') JOB=tracking-sync ;;
+            '') JOB=all ;;
+            *) JOB=expire-checkouts ;;
+          esac
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" "$VELBERRY_URL/api/cron/$JOB"

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Velberry Studio — Admin</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Nunito:wght@400;600;700;800&family=Parisienne&family=Playfair+Display:ital,wght@0,400..700;1,400..600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/velberry.css">
+  <link rel="stylesheet" href="/css/pages.css">
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/css/curtain.css">
+</head>
+<body class="admin">
+  <div class="adm-shell">
+    <aside class="adm-side">
+      <a class="logo" href="/"><span class="logo-word">Velberry</span><span class="logo-sub">studio admin</span></a>
+      <nav class="adm-nav" aria-label="Admin">
+        <a href="#dashboard" data-nav="dashboard">Dashboard</a>
+        <a href="#orders" data-nav="orders">Orders</a>
+        <a href="#products" data-nav="products">Products</a>
+        <a href="#categories" data-nav="categories">Categories</a>
+        <a href="#todays-special" data-nav="todays-special">Today's Special</a>
+        <a href="#notifications" data-nav="notifications">Emails</a>
+        <a href="#setup" data-nav="setup">Setup &amp; integrations</a>
+      </nav>
+      <div class="adm-side-foot"><span data-me></span><button class="link-btn" type="button" data-logout>Log out</button><a href="/">View shop ↗</a></div>
+    </aside>
+    <main class="adm-main" id="main" data-view aria-live="polite"></main>
+  </div>
+  <div class="toasts" role="status" aria-live="polite"></div>
+  <script type="module" src="/admin/admin.js"></script>
+</body>
+</html>

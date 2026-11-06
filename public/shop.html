@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Boutique — Velberry</title>
+  <meta name="description" content="Browse every handmade Velberry clay keychain — strawberries, sweet treats, florals, ocean charms and little animal friends.">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;600;700;800&family=Parisienne&family=Playfair+Display:ital,wght@0,400..700;1,400..600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/velberry.css">
+  <link rel="stylesheet" href="/css/pages.css">
+</head>
+<body data-page="shop" data-chain="slim" data-dock="on">
+  <main id="main" class="bg-gingham-cream">
+    <header class="shop-head wrap">
+      <span class="eyebrow">Maison Velberry</span>
+      <h1 class="script-title" data-title>The Boutique</h1>
+      <p class="lede cat-intro" data-intro>Every little treasure we make, all in one sweet display case.</p>
+    </header>
+    <div class="wrap" style="padding-bottom: 80px">
+      <nav class="cat-tabs" data-tabs aria-label="Collections"></nav>
+      <div class="shop-tools">
+        <label class="sr-only" for="q">Search charms</label>
+        <input class="input" id="q" type="search" placeholder="Search for a charm…" autocomplete="off">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="muted" data-count></span>
+          <label class="sr-only" for="sort">Sort</label>
+          <select class="input" id="sort">
+            <option value="">Our favourites</option>
+            <option value="new">Newest</option>
+            <option value="price_asc">Price: low to high</option>
+            <option value="price_desc">Price: high to low</option>
+          </select>
+        </div>
+      </div>
+      <div class="product-grid" data-grid aria-live="polite"></div>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/shop.js"></script>
+</body>
+</html>

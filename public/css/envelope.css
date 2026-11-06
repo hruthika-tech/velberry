@@ -1,0 +1,106 @@
+/* ═════════════ Order confirmation — the envelope ═════════════ */
+.letter-page { min-height: calc(100vh - var(--header-h)); padding: 36px 0 70px; overflow: hidden; }
+.env-intro { text-align: center; margin-bottom: 8px; min-height: 92px; }
+.env-intro h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 6px 0 0; transition: opacity .5s; }
+.env-scene {
+  --W: min(520px, 90vw);
+  --EH: calc(var(--W) * .62);
+  position: relative; width: var(--W); margin: 0 auto; perspective: 1600px;
+}
+
+/* envelope parts share one stacking context with the letter (no transforms on .envelope itself once settled) */
+.envelope { position: absolute; left: 0; width: var(--W); height: var(--EH); }
+.env-back {
+  position: absolute; inset: 0; z-index: 1; border-radius: 8px; background: #A9455C;
+  box-shadow: 0 30px 50px -24px rgba(91, 30, 45, .65);
+}
+.env-liner {
+  position: absolute; inset: 6px 6px auto; height: 62%; clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background-color: #FFF4F0;
+  background-image: linear-gradient(90deg, rgba(201, 108, 128, .35) 50%, transparent 50%), linear-gradient(rgba(201, 108, 128, .35) 50%, transparent 50%);
+  background-size: 18px 18px;
+}
+.env-pocket { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.env-pocket svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 -2px 3px rgba(91, 30, 45, .18)); }
+.env-flap { position: absolute; left: 0; top: 0; width: 100%; height: 64%; z-index: 4; transform-origin: 50% 0; transform-style: preserve-3d; }
+.env-flap .face, .env-flap .back { position: absolute; inset: 0; backface-visibility: hidden; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.env-flap .face { background: linear-gradient(180deg, #D27186, #C35F76); }
+.env-flap .face::after { content: ''; position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 50% 100%, 50% 96%, 96% 2%, 4% 2%, 50% 96%, 50% 100%); background: rgba(255, 255, 255, .25); }
+.env-flap .back {
+  transform: rotateX(180deg);
+  background-color: #FFF4F0;
+  background-image: linear-gradient(90deg, rgba(201, 108, 128, .35) 50%, transparent 50%), linear-gradient(rgba(201, 108, 128, .35) 50%, transparent 50%);
+  background-size: 18px 18px;
+}
+.env-stickers { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.sticker { position: absolute; filter: drop-shadow(0 0 0 #fff) drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff) drop-shadow(0 3px 4px rgba(0, 0, 0, .2)); }
+.sticker svg { width: 100%; height: 100%; }
+.stamp {
+  position: absolute; right: 7%; bottom: 10%; width: 17%; aspect-ratio: .82; background: #FFF8EE; padding: 4px;
+  -webkit-mask: radial-gradient(circle 3px at 3px 3px, transparent 98%, #000) -3px -3px / 8px 8px;
+  mask: radial-gradient(circle 3px at 3px 3px, transparent 98%, #000) -3px -3px / 8px 8px; transform: rotate(6deg);
+}
+.stamp div { width: 100%; height: 100%; background: var(--matcha); display: grid; place-items: center; }
+.stamp svg { width: 70%; height: 70%; }
+.postmark {
+  position: absolute; left: 8%; bottom: 12%; font-family: var(--f-serif); font-weight: 700; font-size: clamp(.55rem, 1.6vw, .72rem); letter-spacing: .2em; text-transform: uppercase;
+  color: rgba(255, 244, 240, .9); border: 1.5px dashed rgba(255, 244, 240, .7); border-radius: 4px; padding: 4px 8px; transform: rotate(-4deg);
+}
+.env-seal { position: absolute; z-index: 8; left: 50%; width: 19%; aspect-ratio: 1; transform: translate(-50%, -50%) scale(0); opacity: 0; pointer-events: none; }
+.env-seal svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 8px rgba(91, 30, 45, .4)); }
+
+/* ── the letter ── */
+.letter { position: absolute; left: 5%; width: 90%; z-index: 2; transform-style: preserve-3d; opacity: 0; scroll-margin-top: calc(var(--header-h) + 18px); }
+/* NB: no overflow:hidden on panels — it would flatten the 3D faces and show the text mirrored while folding */
+.letter .panel { position: absolute; left: 0; width: 100%; transform-style: preserve-3d; padding: 0; border-radius: 0; box-shadow: none; background: none; }
+.letter .panel .face, .letter .panel .back { position: absolute; inset: 0; backface-visibility: hidden; overflow: hidden; }
+.letter .panel .back { transform: rotateX(180deg); background: #FBF3E6; box-shadow: inset 0 0 0 1px rgba(91, 58, 58, .06); }
+.letter .p0 { transform-origin: 50% 100%; }
+.letter .p2 { transform-origin: 50% 0; }
+.letter .p1 { box-shadow: 0 10px 24px -12px rgba(91, 58, 58, .45); }
+.letter .p1 .face::after, .letter .p0 .face::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: rgba(91, 58, 58, .08); }
+
+.paper {
+  background-color: #FFFCF6;
+  background-image: repeating-linear-gradient(transparent 0 27px, rgba(209, 151, 162, .22) 27px 28px);
+  background-position: 0 14px;
+  color: var(--ink); padding: 26px clamp(18px, 4vw, 30px) 28px; position: relative;
+}
+.paper::before { content: ''; position: absolute; top: 0; bottom: 0; left: clamp(12px, 2.6vw, 20px); width: 1px; background: rgba(201, 108, 128, .3); }
+.letter-read { position: absolute; inset: 0; overflow: auto; z-index: 3; box-shadow: 0 26px 50px -20px rgba(91, 58, 58, .5); overscroll-behavior: contain; display: none; }
+.letter.reading .letter-read { display: block; }
+.letter.reading .panel { visibility: hidden; }
+.tape-l, .tape-r { position: absolute; top: -10px; width: 74px; height: 22px; background: rgba(230, 192, 201, .78); z-index: 4; }
+.letter:not(.reading) .tape-l, .letter:not(.reading) .tape-r { display: none; }
+.tape-l { left: -14px; transform: rotate(-28deg); }
+.tape-r { right: -14px; transform: rotate(28deg); background: rgba(188, 202, 125, .7); }
+
+.lt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.lt-brand { font-family: var(--f-script); font-size: 2rem; color: var(--guava); line-height: 1; }
+.lt-brand small { display: block; font-family: var(--f-serif); font-size: .58rem; letter-spacing: .32em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.lt-date { font-family: var(--f-serif); font-style: italic; color: var(--muted); font-size: .95rem; text-align: right; }
+.lt-dear { font-family: var(--f-script); font-size: 1.9rem; color: var(--cocoa); margin: 4px 0 4px; line-height: 1.2; }
+.lt-body { font-family: var(--f-serif); font-size: 1.12rem; line-height: 28px; margin-bottom: 14px; }
+.lt-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .84rem; margin-bottom: 12px; }
+.lt-meta b { color: var(--cocoa); }
+.lt-items { width: 100%; border-collapse: collapse; font-size: .9rem; margin-bottom: 8px; }
+.lt-items td { padding: 8px 4px; border-bottom: 1px dotted var(--kobi); vertical-align: middle; }
+.lt-items img { width: 46px; height: 46px; border-radius: 5px; object-fit: cover; box-shadow: 0 0 0 2px #fff, 0 2px 5px rgba(91, 58, 58, .2); }
+.lt-items .n { font-weight: 700; color: var(--cocoa); line-height: 1.25; }
+.lt-items .v { font-size: .78rem; color: var(--muted); }
+.lt-items .r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lt-sum { margin-left: auto; width: min(240px, 100%); font-size: .92rem; }
+.lt-sum div { display: flex; justify-content: space-between; padding: 3px 0; }
+.lt-sum .t { border-top: 1.5px dashed var(--kobi); margin-top: 4px; padding-top: 7px; font-weight: 800; color: var(--guava-deep); font-size: 1.05rem; }
+.lt-addr { margin-top: 14px; font-size: .9rem; line-height: 1.5; padding: 10px 12px; background: rgba(246, 227, 230, .55); border-radius: 6px; }
+.lt-addr b { font-family: var(--f-serif); letter-spacing: .2em; text-transform: uppercase; font-size: .7rem; color: var(--guava); display: block; margin-bottom: 2px; }
+.lt-note { margin-top: 10px; font-family: var(--f-serif); font-style: italic; font-size: 1.02rem; }
+.lt-sign { margin-top: 16px; text-align: right; font-family: var(--f-serif); font-style: italic; color: var(--muted); }
+.lt-sign span { display: block; font-family: var(--f-script); font-size: 1.8rem; font-style: normal; color: var(--guava); line-height: 1.2; }
+
+.letter-controls { position: relative; z-index: 10; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; transition: opacity .4s; }
+.env-final { text-align: center; margin-top: 26px; opacity: 0; transform: translateY(10px); transition: opacity .6s, transform .6s var(--ease-soft); }
+.env-final.show { opacity: 1; transform: none; }
+.env-final .script { font-size: clamp(2rem, 6vw, 3rem); display: block; line-height: 1.1; }
+.env-final .actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.confirming { text-align: center; max-width: 520px; margin: 40px auto; }
