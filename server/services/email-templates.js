@@ -20,7 +20,7 @@ function layout({ preheader, title, script, body, appUrl }) {
 <tr><td style="padding:6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px dashed ${C.kobi};border-radius:4px">
 <tr><td align="center" style="padding:28px 24px 8px">
   <div style="font-size:12px;letter-spacing:4px;text-transform:uppercase;color:${C.guava}">✿ Maison ✿</div>
-  <div style="font-size:34px;font-style:italic;color:${C.guava};line-height:1.1">Velberry</div>
+  <div style="font-size:30px;font-style:italic;font-weight:bold;letter-spacing:3px;color:${C.guava};line-height:1.1">CLAYSLAY</div>
   <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:${C.kobi};margin-top:4px">handmade clay charms</div>
   <div style="color:${C.kobi};font-size:14px;margin-top:10px">· ♡ · ✿ · ♡ ·</div>
 </td></tr>
@@ -65,31 +65,31 @@ export function renderEmail(type, { order, items, shipment, extra, appUrl }) {
 
   const T = {
     order_confirmed: () => ({
-      subject: `Your Velberry order ${order.order_number} is confirmed 🎀`,
+      subject: `Your CLAYSLAY order ${order.order_number} is confirmed 🎀`,
       html: layout({ ...base, preheader: 'Payment received — your little treasures are getting ready!', script: 'a little letter for you', title: 'Your little treasures are getting ready!',
         body: `<p>Hi ${first},</p><p>Thank you so much for your order! Your payment of <strong>${rupees(order.total)}</strong> has been received and confirmed. Each charm is shaped, baked and glazed by hand, and we'll write again the moment your parcel is on its way.</p>
         <p style="font-size:13px;color:#8a6b6b">Order <strong>${esc(order.order_number)}</strong> · Payment: <strong style="color:#6b7d2a">Paid</strong></p>
         ${itemsTable(items, order, appUrl)}${address(order)}${button(trackUrl, 'Track my order')}` }),
     }),
     order_preparing: () => ({
-      subject: `We're making your Velberry charms ✿ (${order.order_number})`,
+      subject: `We're making your CLAYSLAY charms ✿ (${order.order_number})`,
       html: layout({ ...base, preheader: 'Your order is on the workbench', script: 'fresh from the workbench', title: 'Your order is being prepared',
         body: `<p>Hi ${first},</p><p>Your little treasures are on our workbench right now — being finished, polished and checked one by one. Next stop: a cosy, ribbon-tied box.</p>${button(trackUrl, 'See order progress')}` }),
     }),
     shipped: () => ({
-      subject: `Your Velberry parcel is on its way 🚚 (${order.order_number})`,
+      subject: `Your CLAYSLAY parcel is on its way 🚚 (${order.order_number})`,
       html: layout({ ...base, preheader: 'Your parcel has been handed to the courier', script: 'it has left the boutique', title: 'Your parcel is on its way!',
         body: `<p>Hi ${first},</p><p>Your parcel has been picked up by our courier partner and is travelling to you.</p>${shipBox(shipment)}${button(shipment?.tracking_url || trackUrl, 'Track my parcel')}` }),
     }),
     tracking: () => ({
-      subject: `Update on your Velberry parcel (${order.order_number})`,
+      subject: `Update on your CLAYSLAY parcel (${order.order_number})`,
       html: layout({ ...base, preheader: extra.description || 'A tracking update', script: 'a little update', title: esc(extra.label || 'Tracking update'),
         body: `<p>Hi ${first},</p><p>${esc(extra.description || 'There is a new update on your shipment.')}${extra.location ? ` <em>(${esc(extra.location)})</em>` : ''}</p>${shipBox(shipment)}${button(trackUrl, 'View tracking')}` }),
     }),
     out_for_delivery: () => ({
       subject: `Out for delivery today 💌 (${order.order_number})`,
       html: layout({ ...base, preheader: 'Your parcel arrives today', script: 'almost there…', title: 'Your parcel is out for delivery',
-        body: `<p>Hi ${first},</p><p>Your Velberry parcel is out for delivery and should reach you today. Please keep your phone handy for the courier.</p>${shipBox(shipment)}${button(trackUrl, 'Track live')}` }),
+        body: `<p>Hi ${first},</p><p>Your CLAYSLAY parcel is out for delivery and should reach you today. Please keep your phone handy for the courier.</p>${shipBox(shipment)}${button(trackUrl, 'Track live')}` }),
     }),
     delivered: () => ({
       subject: `Delivered! Enjoy your little treasures 🍓 (${order.order_number})`,

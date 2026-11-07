@@ -23,7 +23,7 @@ function renderTabs() {
   const cat = categories.find((c) => c.slug === state.category);
   $('[data-title]').textContent = cat ? cat.name : 'The Boutique';
   $('[data-intro]').textContent = cat?.description || 'Every little treasure we make, all in one sweet display case.';
-  document.title = `${cat ? cat.name : 'The Boutique'} — Velberry`;
+  document.title = `${cat ? cat.name : 'The Boutique'} — CLAYSLAY`;
 }
 
 async function load() {

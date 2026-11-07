@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import pg from 'pg';
+// Subpath import: only the pool helper, not the rest of @vercel/functions (OIDC, caching, …).
+import { attachDatabasePool } from '@vercel/functions/db-connections';
 import { config, ROOT } from '../config.js';
 
 // Return BIGINT/NUMERIC as JS numbers (ids & sums here are far below 2^53) and timestamps as ISO strings.
@@ -23,17 +25,26 @@ if (!config.db.url) {
   throw new Error('DATABASE_URL is not set. Add your Supabase Postgres connection string to .env (see README → Supabase).');
 }
 
+// ONE pool per process / serverless instance, created when this module first loads and shared by every route,
+// webhook and cron job (on Vercel all of them run in the single api/index.js function).
 export const pool = new pg.Pool({
   connectionString: config.db.url,
   max: config.db.poolMax,
   ssl: config.db.ssl,
-  idleTimeoutMillis: 30_000,
+  idleTimeoutMillis: config.db.idleTimeoutMs, // 5 s on Vercel, 30 s locally (config.js)
   keepAlive: true, // TCP keep-alives stop routers/NAT from silently dropping long-lived connections to Supabase
   keepAliveInitialDelayMillis: 10_000,
   connectionTimeoutMillis: 15_000,
   application_name: 'velberry',
 });
 pool.on('error', (e) => console.error('[db] idle client error:', e.message));
+
+// Vercel Fluid compute can suspend an instance as soon as a response ends. A suspended instance can't run the
+// pool's idle timer, so its idle connections would stay open — each holding a Supabase pooler slot. Vercel's
+// attachDatabasePool listens for every client "release" and keeps the instance alive (waitUntil) for
+// idleTimeoutMillis + 100 ms so pg can close those idle connections first. Outside Vercel it does nothing,
+// so it's only attached there.
+if (config.serverless) attachDatabasePool(pool);
 
 const als = new AsyncLocalStorage();
 const runner = () => als.getStore()?.client || pool;

@@ -1,5 +1,5 @@
 /**
- * Velberry studio admin (hash-routed SPA). All data comes from /api/admin/* which is protected
+ * CLAYSLAY studio admin (hash-routed SPA). All data comes from /api/admin/* which is protected
  * server-side by the admin role — this page only renders.
  */
 import { api, money, esc, fmtDate, fmtDateTime, $, $$, showFieldErrors } from '/js/api.js';

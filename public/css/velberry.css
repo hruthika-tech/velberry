@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   VELBERRY — design system
+   CLAYSLAY — design system (file name kept from the original brand)
    A vintage patisserie menu × kawaii stationery × coquette boutique.
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -194,7 +194,8 @@ p { margin: 0 0 1em; }
 }
 .header-inner { height: var(--header-h); display: flex; align-items: center; gap: 20px; }
 .logo { display: inline-flex; flex-direction: column; align-items: flex-start; text-decoration: none; line-height: 1; margin-right: auto; }
-.logo-word { font-family: var(--f-script); font-size: 2.35rem; color: var(--guava); line-height: .9; }
+/* CLAYSLAY wordmark: the display serif in capitals (a script face is hard to read in all caps) */
+.logo-word { font-family: var(--f-display); font-weight: 600; font-style: italic; font-size: 1.85rem; letter-spacing: .08em; color: var(--guava); line-height: .9; }
 .logo-sub { margin-top: 11px; font-family: var(--f-serif); font-size: .64rem; font-weight: 700; letter-spacing: .38em; text-transform: uppercase; color: var(--muted); margin-left: 4px; }
 .logo:hover .logo-word { color: var(--guava-deep); }
 .nav { display: flex; align-items: center; gap: 4px; }
@@ -222,7 +223,7 @@ p { margin: 0 0 1em; }
 
 @media (max-width: 860px) {
   :root { --header-h: 64px; }
-  .logo-word { font-size: 1.95rem; }
+  .logo-word { font-size: 1.5rem; }
   .logo-sub { font-size: .55rem; }
   .menu-toggle { display: grid; }
   .nav {
@@ -380,7 +381,7 @@ p { margin: 0 0 1em; }
 .footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
 .footer-grid h4 { font-family: var(--f-serif); color: var(--ballerina); font-size: .82rem; letter-spacing: .28em; text-transform: uppercase; font-weight: 700; margin-bottom: 14px; }
 .footer-grid ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: .94rem; }
-.footer-logo { font-family: var(--f-script); font-size: 2.6rem; color: var(--ballerina); line-height: 1; }
+.footer-logo { font-family: var(--f-display); font-weight: 600; font-style: italic; font-size: 2rem; letter-spacing: .08em; color: var(--ballerina); line-height: 1; }
 .footer-note { font-family: var(--f-serif); font-style: italic; font-size: 1.1rem; color: #E9CBD1; max-width: 30ch; }
 .footer-base { border-top: 1px dashed rgba(230, 192, 201, .35); margin-top: 40px; padding-top: 20px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .82rem; color: #CDAFB5; }
 @media (max-width: 760px) { .footer-grid { grid-template-columns: 1fr 1fr; } .footer-grid > :first-child { grid-column: 1 / -1; } }

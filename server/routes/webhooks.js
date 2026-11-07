@@ -27,6 +27,12 @@ async function firstTime(provider, eventId, type, payload) {
  */
 r.post('/razorpay', express.raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
   const raw = req.body instanceof Buffer ? req.body : Buffer.from('');
+  // The signature is computed over the exact bytes Razorpay sent. If the host consumed/parsed the body before
+  // Express could read it raw, verification can't work — say so clearly instead of a misleading "bad signature".
+  if (!raw.length && Number(req.headers['content-length'] || 0) > 0) {
+    console.error('[webhook razorpay] the raw request body was not available for signature verification — on Vercel, set NODEJS_HELPERS=0');
+    return res.status(400).json({ error: 'request body unavailable' });
+  }
   if (!razorpay.verifyWebhookSignature(raw, req.headers['x-razorpay-signature'])) return res.status(400).json({ error: 'bad signature' });
   let evt;
   try { evt = JSON.parse(raw.toString('utf8')); } catch { return res.status(400).json({ error: 'invalid JSON' }); }

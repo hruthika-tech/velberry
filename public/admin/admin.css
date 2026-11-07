@@ -1,4 +1,4 @@
-/* Velberry studio admin — same brand tokens, calmer working layout */
+/* CLAYSLAY studio admin — same brand tokens, calmer working layout */
 body.admin { background: #FBF7F1; padding: 0; }
 .adm-shell { display: grid; grid-template-columns: 236px 1fr; min-height: 100vh; }
 .adm-side {

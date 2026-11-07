@@ -1,5 +1,5 @@
 /**
- * Velberry — Today's Special: the floral French curtain introduction.
+ * CLAYSLAY — Today's Special: the floral French curtain introduction.
  *
  * On the homepage (when /js/curtain-boot.js decided this visitor should see it), the closed curtains and the
  * Today's Special board are shown above the page. "Open the Boutique", a tap on the board, the × or Esc draws
@@ -53,7 +53,7 @@ export function boardHTML(products, { titleId = 'vbc-title' } = {}) {
       <span class="vbc-gingham" aria-hidden="true"></span><span class="vbc-bow">${BOW}</span>
       <span class="vbc-corner tl">${SPRIG}</span><span class="vbc-corner tr">${SPRIG}</span><span class="vbc-corner bl">${SPRIG}</span><span class="vbc-corner br">${SPRIG}</span>
       ${twinkles}${hearts}
-      <span class="vbc-maison">Maison Velberry</span>
+      <span class="vbc-maison">Maison CLAYSLAY</span>
       <h2 class="vbc-title" id="${titleId}">TODAY'S SPECIAL</h2>
       <div class="vbc-divider" aria-hidden="true"><span>♥✦♥</span></div>
       <p class="vbc-sub">${n === 3 ? 'Three little treasures, specially chosen for you.' : 'Little treasures, specially chosen for you.'}</p>

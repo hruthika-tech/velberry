@@ -208,7 +208,7 @@ function pay(order) {
         key: order.razorpayKeyId,
         amount: order.amount,
         currency: order.currency,
-        name: 'Velberry',
+        name: 'CLAYSLAY',
         description: `Order ${order.orderNumber}`,
         order_id: order.razorpayOrderId,
         prefill: order.prefill,

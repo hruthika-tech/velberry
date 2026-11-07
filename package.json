@@ -2,7 +2,7 @@
   "name": "velberry",
   "version": "1.0.0",
   "private": true,
-  "description": "Velberry — handmade clay keychain boutique (storefront, checkout, admin)",
+  "description": "CLAYSLAY — handmade clay keychain boutique (storefront, checkout, admin)",
   "type": "module",
   "engines": {
     "node": ">=22.13"
@@ -19,8 +19,12 @@
     "vercel-build": "node --disable-warning=ExperimentalWarning scripts/vercel-build.js"
   },
   "dependencies": {
+    "@vercel/functions": "3.10.2",
     "express": "5.1.0",
     "pg": "^8.13.1",
     "three": "0.170.0"
+  },
+  "overrides": {
+    "zod": "4.6.7"
   }
 }

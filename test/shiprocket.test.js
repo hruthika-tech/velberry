@@ -342,7 +342,7 @@ test('config: booking is off by default outside production, on in production; th
   assert.deepEqual(await cfg({}), { allow: false, base: 'http://evil.example' });
   assert.deepEqual(await cfg({ SHIPROCKET_ALLOW_BOOKING: 'true' }), { allow: true, base: 'http://evil.example' });
   const prod = { NODE_ENV: 'production', APP_URL: 'https://velberry.example', PAYMENT_PROVIDER: 'razorpay', RAZORPAY_MODE: 'live', RAZORPAY_KEY_ID: 'rzp_live_x',
-    RAZORPAY_KEY_SECRET: 's', RAZORPAY_WEBHOOK_SECRET: 'w', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' };
+    RAZORPAY_KEY_SECRET: 's', RAZORPAY_WEBHOOK_SECRET: 'w', SUPABASE_URL: 'https://storage.example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k' };
   assert.deepEqual(await cfg(prod), { allow: true, base: 'https://apiv2.shiprocket.in/v1/external' });
   assert.deepEqual(await cfg({ ...prod, SHIPROCKET_ALLOW_BOOKING: 'false' }), { allow: false, base: 'https://apiv2.shiprocket.in/v1/external' });
 });

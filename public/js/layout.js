@@ -2,9 +2,10 @@
  * Shared page chrome: header (nav + bag), footer, decorative chains.
  * Pages opt in via <body data-page="…" data-chain="hero|slim|none" data-dock="on|off">.
  */
-import { api } from './api.js';
+import { api, esc } from './api.js';
 import { cart } from './ui.js';
 import { mountChain, mountDockChain } from './chain.js';
+import { SITE } from './site-info.js';
 
 const BAG_ICON = `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M7 11h18l-1.4 15.2a2 2 0 0 1-2 1.8H10.4a2 2 0 0 1-2-1.8Z"/><path d="M11.5 11V9a4.5 4.5 0 0 1 9 0v2"/>
@@ -19,7 +20,7 @@ function header(page) {
   return `<a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap header-inner">
-      <a class="logo" href="/" aria-label="Velberry home"><span class="logo-word">Velberry</span><span class="logo-sub">handmade clay charms</span></a>
+      <a class="logo" href="/" aria-label="CLAYSLAY home"><span class="logo-word">CLAYSLAY</span><span class="logo-sub">handmade clay charms</span></a>
       <nav class="nav" id="site-nav" aria-label="Main">
         ${link('/shop.html', 'The Boutique', 'shop')}
         ${link('/#menu', 'Our Little Menu', 'menu')}
@@ -40,7 +41,7 @@ function footer() {
     <div class="wrap">
       <div class="footer-grid">
         <div>
-          <div class="footer-logo">Velberry</div>
+          <div class="footer-logo">CLAYSLAY</div>
           <p class="footer-note">Tiny clay treasures, shaped by hand and baked with love in our little studio in India.</p>
         </div>
         <div><h4>Shop</h4><ul>
@@ -50,9 +51,12 @@ function footer() {
           <li><a href="/track.html">Track my order</a></li><li><a href="/account.html">My account</a></li>
           <li><a href="/shipping.html">Shipping &amp; returns</a></li><li><a href="/care.html">Charm care</a></li></ul></div>
         <div><h4>Say hello</h4><ul>
-          <li><a href="mailto:hello@velberry.in">hello@velberry.in</a></li><li><a href="https://instagram.com/" rel="noopener">Instagram</a></li></ul></div>
+          <li><a href="/contact.html">Contact us</a></li>
+          ${SITE.contactEmail ? `<li><a href="mailto:${esc(SITE.contactEmail)}">${esc(SITE.contactEmail)}</a></li>` : ''}
+          ${SITE.instagram ? `<li><a href="${esc(SITE.instagram)}" rel="noopener">Instagram</a></li>` : ''}
+          <li><a href="/privacy.html">Privacy policy</a></li><li><a href="/terms.html">Terms &amp; conditions</a></li></ul></div>
       </div>
-      <div class="footer-base"><span>© ${new Date().getFullYear()} Velberry · Made by hand, packed with love</span><span>Secure payments by Razorpay · UPI · Cards · Netbanking</span></div>
+      <div class="footer-base"><span>© ${new Date().getFullYear()} CLAYSLAY · Made by hand, packed with love</span><span>Secure payments by Razorpay · UPI · Cards · Netbanking</span></div>
     </div>
   </footer>`;
 }

@@ -1,5 +1,5 @@
 /**
- * Velberry charm illustrations — hand-tuned kawaii SVG, 100×100 viewBox.
+ * CLAYSLAY charm illustrations — hand-tuned kawaii SVG, 100×100 viewBox.
  * `hook` is the y coordinate where a jump ring attaches. Shared by the decorative chains,
  * menu icons and the seed product artwork (scripts/generate-art.js), so everything matches.
  * Pure strings, no DOM — safe to import in Node too.

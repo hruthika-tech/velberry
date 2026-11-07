@@ -10,6 +10,8 @@
  *   --public-dir <dir>   folder that /uploads/... image URLs are served from (default: public/)
  *   --skip-images        don't upload images to Supabase Storage, keep their current URLs
  *   --dry-run            preview only
+ *   --production         required when the target is the Production project (PRODUCTION_SUPABASE_REF), dry runs too
+ *   --force-into-nonempty  with --production: allow importing into a Production database that already holds data
  *
  * Target: DATABASE_URL (from the environment or .env). Images go to Supabase Storage when SUPABASE_URL +
  * SUPABASE_SERVICE_ROLE_KEY are set (run `npm run setup-storage` first).
@@ -41,6 +43,10 @@ const { values: opt } = parseArgs({
     sqlite: { type: 'string' },
     'public-dir': { type: 'string' },
     help: { type: 'boolean', short: 'h', default: false },
+    // Production safety (see server/lib/script-guard.js). The parser stays strict: "--production=yes",
+    // "--Production" or any other look-alike is rejected as an error, never ignored.
+    production: { type: 'boolean', default: false },
+    'force-into-nonempty': { type: 'boolean', default: false },
   },
 });
 if (opt.help) {
@@ -53,6 +59,22 @@ const { config, ROOT } = await import('../server/config.js');
 if (!config.db.url) fail('DATABASE_URL is not set. Put your Supabase connection string in .env (see README → Supabase).');
 const { pool, closeDb } = await import('../server/db/index.js');
 const storage = await import('../server/services/storage.js');
+
+/* ───────────── 0. Production guard — before ANY database or Storage request ─────────────
+ * Production (PRODUCTION_SUPABASE_REF) needs --production, for --dry-run too. Into a Production database that
+ * already holds data, it additionally needs --force-into-nonempty (re-importing could resurrect deleted records). */
+{
+  const { guardScript, nonEmptyTables, importDecision } = await import('../server/lib/script-guard.js');
+  const decision = guardScript('migrate:sqlite', opt.production ? ['--production'] : []);
+  const filled = decision.production ? await nonEmptyTables(async (sql) => (await pool.query(sql)).rows[0]) : [];
+  const d = importDecision({ production: Boolean(decision.production), force: opt['force-into-nonempty'], filled });
+  if (!d.ok) {
+    console.error(`\n✗ migrate:sqlite: ${d.message}\n`);
+    await closeDb();
+    process.exit(2);
+  }
+  if (d.message) console.log(`   ⚠ ${d.message}`);
+}
 
 /* ───────────── table plan (parents before children) ───────────── */
 const TABLES = [

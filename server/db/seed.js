@@ -11,6 +11,7 @@ import { config, ROOT } from '../config.js';
 import { ensureAdmin } from './bootstrap.js';
 import { CATEGORIES, PRODUCTS } from './seed-data.js';
 import * as storage from '../services/storage.js';
+import { guardScript } from '../lib/script-guard.js';
 
 const SEED_DIR = path.join(ROOT, 'public', 'uploads', 'seed');
 
@@ -68,6 +69,8 @@ export async function seedCatalog({ force = false } = {}) {
 }
 
 if (process.argv[1]?.endsWith('seed.js')) {
+  // Refuses Production unless run as `npm run seed -- --production` (see server/lib/script-guard.js).
+  guardScript('seed');
   await migrate({ log: console.log });
   await ensureAdmin();
   const did = await seedCatalog({ force: process.argv.includes('--force') });

@@ -19,6 +19,8 @@
 import crypto from 'node:crypto';
 
 const { config } = await import('../server/config.js');
+// Refuses Production unless run as `npm run setup-storage -- --production` (see server/lib/script-guard.js).
+(await import('../server/lib/script-guard.js')).guardScript('setup-storage');
 const storage = await import('../server/services/storage.js');
 const S = config.supabase;
 

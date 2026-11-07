@@ -65,7 +65,7 @@
   clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
 }
 .gb-label::before { content: ''; position: absolute; left: 9px; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: var(--ballerina); transform: translateY(-50%); }
-.gb-label em { font-family: var(--f-script); font-style: normal; font-size: clamp(1.1rem, 3.4vw, 1.5rem); color: var(--guava); }
+.gb-label em { font-family: var(--f-display); font-weight: 600; font-style: italic; letter-spacing: .08em; font-size: clamp(.95rem, 2.8vw, 1.2rem); color: var(--guava); }
 .gb-label small { font-family: var(--f-serif); font-size: .58rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
 
 .gb-lid {

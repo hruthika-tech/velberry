@@ -9,6 +9,8 @@ if (!config.db.url) {
   console.error('\n✗ DATABASE_URL is not set (see README → Supabase).\n');
   process.exit(1);
 }
+// Refuses Production unless run as `npm run db:migrate -- --production` (see server/lib/script-guard.js).
+(await import('../server/lib/script-guard.js')).guardScript('db:migrate');
 const { migrate, all, closeDb } = await import('../server/db/index.js');
 try {
   await migrate({ log: (m) => console.log(`   ${m}`) });

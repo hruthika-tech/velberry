@@ -1,5 +1,5 @@
 /*
- * Velberry — Today's Special, step 0 (runs in <head>, before the page is painted).
+ * CLAYSLAY — Today's Special, step 0 (runs in <head>, before the page is painted).
  * If this visitor should see the closed curtains, draw them immediately (CSS) so the homepage never flashes
  * underneath; /js/curtain.js then fills in the real curtains and the board.
  * Only a "seen" marker and a "no special right now" hint are stored — never anything personal.

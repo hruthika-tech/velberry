@@ -1,9 +1,11 @@
-# Velberry 🍓 — handmade clay keychain boutique
+# CLAYSLAY 🍓 — handmade clay keychain boutique
 
-A complete e-commerce site for Velberry: storefront, bag, checkout with Razorpay, Shiprocket shipping and tracking, customer accounts, branded emails, and an admin studio.
+A complete e-commerce site for CLAYSLAY (www.clayslay.in, formerly “Velberry”): storefront, bag, checkout with Razorpay, Shiprocket shipping and tracking, customer accounts, branded emails, and an admin studio.
 
 **Stack:** Node.js ≥ 22.13 + Express 5, **Supabase PostgreSQL** (via `pg`), **Supabase Storage** for product photos, and a vanilla ES-module frontend with no build step. The homepage 3D charm uses three.js.
 
+> Internal names (the `velberry` package, `velberry.css`, `data/velberry.db`, the `vb_session` cookie, `VB-` order numbers, `VELBERRY_*` settings) are kept from the original brand on purpose: renaming them would log customers out, break links or change existing records.
+>
 > The shop originally ran on SQLite (`data/velberry.db`). That file is kept untouched; section 2 explains how to copy it into Supabase.
 
 ---
@@ -38,6 +40,14 @@ Other commands:
 | `npm run migrate:sqlite -- --dry-run` | Preview copying `data/velberry.db` into PostgreSQL (writes nothing) |
 | `npm run migrate:sqlite` | Copy `data/velberry.db` into PostgreSQL + images into Storage |
 | `npm run seed -- --force` | Wipe and reseed the starter catalogue (orders are kept) |
+
+> **Production guard.** `db:migrate`, `setup-storage`, `seed`, `create-admin`, `migrate:sqlite` and `npm start` find out which Supabase project they're pointed at. If it's the one named in `PRODUCTION_SUPABASE_REF`, they stop and change nothing unless you add `-- --production` (for example `npm run db:migrate -- --production`). If `PRODUCTION_SUPABASE_REF` isn't set, they refuse every Supabase project rather than guess. A local Docker database needs no flag. Permission only ever comes from the command-line flag, never from `.env`.
+>
+> Two extra rules:
+> - **`npm start`** on Production without the flag runs no migrations or seeding. If migrations are pending, it refuses to start.
+> - **`create-admin`** never changes an existing *customer* account unless you add `--promote-existing`, and it no longer creates tables: run `db:migrate` first.
+>
+> **`migrate:sqlite`** into a Production database that already holds data also needs `--force-into-nonempty`, because re-importing could bring back records deleted since.
 | `npm run create-admin -- you@example.com "a strong password" "Your Name"` | Create or promote an admin |
 | `node scripts/generate-art.js` | Regenerate the placeholder product artwork |
 
@@ -52,7 +62,7 @@ While `RAZORPAY_KEY_ID` is empty and `ALLOW_MOCK_PAYMENTS=true`, checkout uses a
 
 ## 2. Supabase: database and image storage
 
-The server talks to Supabase directly with a server-side connection. The browser **never** talks to Supabase, so customers can't see anything the server doesn't hand them. Logins keep using Velberry's own accounts (scrypt passwords + sessions), not Supabase Auth, so existing customer passwords keep working.
+The server talks to Supabase directly with a server-side connection. The browser **never** talks to Supabase, so customers can't see anything the server doesn't hand them. Logins keep using the shop's own accounts (scrypt passwords + sessions), not Supabase Auth, so existing customer passwords keep working.
 
 ### 2.1 Create the project
 
@@ -202,7 +212,7 @@ Without Shiprocket, a flat rate is used. You can still use **Record manual shipm
 2. Set:
    ```
    RESEND_API_KEY=re_xxx
-   EMAIL_FROM=Velberry <hello@yourdomain.com>
+   EMAIL_FROM=CLAYSLAY <hello@yourdomain.com>
    SHOP_OWNER_EMAIL=you@yourdomain.com
    ```
 
@@ -258,13 +268,21 @@ The repository is ready for Vercel (`vercel.json`, `api/index.js`, `scripts/verc
 - **Database migrations are never run automatically on Vercel.** Apply them yourself with `npm run db:migrate` (pointing `.env` at the database) **before** deploying code that needs them. Until then the API answers 503 (“being updated”) instead of running half-migrated.
 - **Photos** go straight from the admin's browser to Supabase Storage with one-time signed URLs, because Vercel caps requests at 4.5 MB. The server checks the type and size first, then verifies the uploaded bytes before attaching the photo. Files that fail are deleted.
 - **Emails** run after the response, and Vercel keeps the function alive for them (`waitUntil`).
-- **Connections:** `DB_POOL_MAX` defaults to 2 per instance. A locked operation (booking, refund, cancel) uses a single connection however deeply it nests.
+- **Connections:** one shared pool per instance, `DB_POOL_MAX` 2 (3 for local development). On Vercel, idle connections close after 5 s (`DB_IDLE_TIMEOUT_MS`), and Vercel's `attachDatabasePool` keeps a finished instance awake just long enough to close them, so a suspended instance doesn't keep holding Supabase pooler slots. A locked operation (booking, refund, cancel) uses a single connection however deeply it nests.
 - **Scheduled jobs** are `/api/cron/expire-checkouts`, `/api/cron/tracking-sync` and `/api/cron/all`. They require `Authorization: Bearer $CRON_SECRET`.
   - **Hobby plan:** Vercel Cron runs at most once a day. `vercel.json` schedules `/api/cron/all` at 03:00 IST, give or take an hour.
   - **Releasing stock without a 5-minute timer:** a new checkout or quote also releases expired checkouts, at most once per 5 minutes across all instances. Stock held by an abandoned checkout is freed before the next customer needs it.
   - **More frequent runs, for free:** `.github/workflows/scheduled-jobs.yml` calls the endpoints every 10 minutes (checkouts) and hourly (tracking) once you add the `VELBERRY_URL` and `CRON_SECRET` repository secrets. GitHub runs these best-effort, often a few minutes late.
   - **Pro plan:** you can instead change the Vercel schedule to `*/5 * * * *`.
   - **Tracking:** the Shiprocket webhook stays the main source of updates.
+- **Preview safety (enforced at startup).** A Preview deployment refuses to start if:
+  - `PAYMENT_PROVIDER` isn't `mock`;
+  - any `RAZORPAY_*` variable is set;
+  - `SHIPROCKET_ALLOW_BOOKING` is anything but `false`;
+  - `RESEND_API_KEY` is set;
+  - `FORBIDDEN_SUPABASE_REF` (the Production project's ref, Preview scope only) is missing or matches its database.
+
+  Every deployment also refuses a `DATABASE_URL` and `SUPABASE_URL` from different Supabase projects.
 - **Preview deployments** may use the payment simulator (`PAYMENT_PROVIDER=mock`), and Shiprocket booking is off there unless `SHIPROCKET_ALLOW_BOOKING=true`. The **production** deployment refuses the simulator. Vercel Cron only calls the production deployment.
 - **`APP_URL`** defaults to the deployment's own https address. Set it to your real domain for Production.
 

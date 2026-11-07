@@ -2,7 +2,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { config, ROOT } from './config.js';
-import { migrate, one, closeDb } from './db/index.js';
+import { migrate, pendingMigrations, one, closeDb } from './db/index.js';
+import { startupPlan, prepareDatabase, StartupRefused } from './db/startup.js';
 import * as storage from './services/storage.js';
 import { ensureAdmin } from './db/bootstrap.js';
 import { seedCatalog } from './db/seed.js';
@@ -82,11 +83,19 @@ function startJobs() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await migrate({ log: console.log });
-  await ensureAdmin();
-  if (await seedCatalog()) console.log('✿ Starter catalogue seeded (replace the artwork with your photos in /admin)');
+  // Before the first database request: Production is never migrated or seeded without `npm start -- --production`.
+  const plan = startupPlan({ argv: process.argv.slice(2), dbRef: config.supabase.dbRef, storageRef: config.supabase.storageRef,
+    productionRefs: process.env.PRODUCTION_SUPABASE_REF || '' });
+  try {
+    await prepareDatabase({ plan, db: { migrate, pendingMigrations, seedCatalog, ensureAdmin } });
+  } catch (e) {
+    if (!(e instanceof StartupRefused)) throw e;
+    console.error(`\n✗ Not starting: ${e.message}\n`);
+    await closeDb();
+    process.exit(2);
+  }
   const server = createApp().listen(config.port, () => {
-    console.log(`\n  🍓 Velberry is open at ${config.appUrl}`);
+    console.log(`\n  🍓 CLAYSLAY is open at ${config.appUrl}`);
     const pay = razorpay.mode();
     console.log(`     payments: ${pay === 'razorpay' ? `Razorpay (${razorpay.environment().toUpperCase()} mode)`
       : pay === 'mock' ? `local simulator — no real payments (${config.payments.explicit ? 'PAYMENT_PROVIDER=mock' : 'PAYMENT_PROVIDER not set, ALLOW_MOCK_PAYMENTS=true'})`

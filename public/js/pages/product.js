@@ -16,7 +16,7 @@ async function init() {
     host.innerHTML = `<div class="empty-state">${charmSVG('cherries', { size: 96 })}<h1>Oh no, it's not here</h1><p class="muted">${esc(e.message)}</p><a class="btn" href="/shop.html">Back to the boutique</a></div>`;
     return;
   }
-  document.title = `${p.name} — Velberry`;
+  document.title = `${p.name} — CLAYSLAY`;
   render(p);
   if (p.related?.length) {
     $('[data-related-wrap]').hidden = false;

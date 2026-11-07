@@ -76,7 +76,7 @@
 .tape-r { right: -14px; transform: rotate(28deg); background: rgba(188, 202, 125, .7); }
 
 .lt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
-.lt-brand { font-family: var(--f-script); font-size: 2rem; color: var(--guava); line-height: 1; }
+.lt-brand { font-family: var(--f-display); font-weight: 600; font-style: italic; font-size: 1.6rem; letter-spacing: .08em; color: var(--guava); line-height: 1; }
 .lt-brand small { display: block; font-family: var(--f-serif); font-size: .58rem; letter-spacing: .32em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
 .lt-date { font-family: var(--f-serif); font-style: italic; color: var(--muted); font-size: .95rem; text-align: right; }
 .lt-dear { font-family: var(--f-script); font-size: 1.9rem; color: var(--cocoa); margin: 4px 0 4px; line-height: 1.2; }

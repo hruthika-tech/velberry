@@ -53,9 +53,9 @@ async function init() {
 function letterHTML(o) {
   const first = o.customer.name.split(' ')[0];
   return `<div class="paper">
-    <div class="lt-head"><div class="lt-brand">Velberry<small>handmade clay charms</small></div><div class="lt-date">${fmtDate(o.paidAt || o.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
+    <div class="lt-head"><div class="lt-brand">CLAYSLAY<small>handmade clay charms</small></div><div class="lt-date">${fmtDate(o.paidAt || o.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
     <div class="lt-dear">Dear ${esc(first)},</div>
-    <p class="lt-body">Thank you for choosing a little piece of Velberry! Your payment is confirmed and your treasures are being lovingly prepared — shaped, glazed and wrapped by hand, just for you.</p>
+    <p class="lt-body">Thank you for choosing a little piece of CLAYSLAY! Your payment is confirmed and your treasures are being lovingly prepared — shaped, glazed and wrapped by hand, just for you.</p>
     <div class="lt-meta"><span>Order <b>${esc(o.orderNumber)}</b></span><span>Payment <b class="chip green">✓ ${o.paymentStatus === 'paid' ? 'Paid' : esc(o.paymentStatus)}</b></span><span>For <b>${esc(o.customer.name)}</b></span></div>
     <table class="lt-items"><tbody>
       ${o.items.map((i) => `<tr><td style="width:54px">${i.image ? `<img src="${esc(i.image)}" alt="">` : ''}</td>
@@ -65,7 +65,7 @@ function letterHTML(o) {
     <div class="lt-sum"><div><span>Subtotal</span><span>${money(o.subtotal)}</span></div><div><span>Delivery</span><span>${o.shippingFee ? money(o.shippingFee) : 'Free'}</span></div><div class="t"><span>Total paid</span><span>${money(o.total)}</span></div></div>
     <div class="lt-addr"><b>Sending it to</b>${esc(o.address.name)} · ${esc(o.address.phone)}<br>${esc(o.address.line1)}${o.address.line2 ? `, ${esc(o.address.line2)}` : ''}<br>${esc(o.address.city)}, ${esc(o.address.state)} – ${esc(o.address.pincode)}</div>
     ${o.giftNote ? `<p class="lt-note">Your gift note: “${esc(o.giftNote)}” — we'll handwrite it on a card ♡</p>` : ''}
-    <div class="lt-sign">With love &amp; sprinkles,<span>the Velberry studio</span></div>
+    <div class="lt-sign">With love &amp; sprinkles,<span>the CLAYSLAY studio</span></div>
   </div>`;
 }
 
@@ -113,7 +113,7 @@ function buildScene(o) {
           <span class="sticker" style="left:7%;top:58%;width:13%;transform:rotate(-14deg)">${charmSVG('strawberry', { size: 60 })}</span>
           <span class="sticker" style="left:22%;top:72%;width:9%;transform:rotate(10deg)">${charmSVG('daisy', { size: 60 })}</span>
           <span class="sticker" style="right:28%;top:66%;width:11%;transform:rotate(8deg)">${charmSVG('bow', { size: 60 })}</span>
-          <span class="postmark">with love · velberry</span>
+          <span class="postmark">with love · clayslay</span>
           <span class="stamp"><div>${charmSVG('heart', { size: 40 })}</div></span>
         </div>
         <div class="env-flap" data-flap><div class="face"></div><div class="back"></div></div>

@@ -358,7 +358,8 @@ function runNode(args, extra) {
     const p = spawn(process.execPath, args, {
       cwd: ROOT,
       env: { PATH: process.env.PATH, SYSTEMROOT: process.env.SYSTEMROOT, VELBERRY_SKIP_ENV_FILE: '1', SESSION_SECRET: 'q'.repeat(40),
-        DATABASE_URL: 'postgres://u:p@db.example.invalid:5432/x', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', ...extra },
+        DATABASE_URL: 'postgres://u:p@db.example.invalid:5432/x', SUPABASE_URL: 'https://storage.example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k',
+        FORBIDDEN_SUPABASE_REF: 'xxvpkrwivuzxnnizrwqm', ...extra },
     });
     let out = '';
     p.stdout.on('data', (d) => { out += d; });
@@ -378,7 +379,7 @@ const VERCEL_PROD = { VERCEL: '1', VERCEL_ENV: 'production', NODE_ENV: 'producti
 test('Vercel config: Preview may use the simulator (booking off, pool 2, own https URL); Production never may', async () => {
   const preview = await cfg({ VERCEL: '1', VERCEL_ENV: 'preview', NODE_ENV: 'production', VERCEL_BRANCH_URL: 'velberry-git-main-shop.vercel.app', PAYMENT_PROVIDER: 'mock' });
   assert.deepEqual(preview, { appUrl: 'https://velberry-git-main-shop.vercel.app', pay: 'mock', pool: 2, booking: false, expiry: true, serverless: true, prod: true });
-  assert.equal((await cfg({ VERCEL: '1', VERCEL_ENV: 'preview', NODE_ENV: 'production', VERCEL_URL: 'x.vercel.app', PAYMENT_PROVIDER: 'mock', SHIPROCKET_ALLOW_BOOKING: 'true' })).booking, true, 'only if asked');
+  assert.match((await cfg({ VERCEL: '1', VERCEL_ENV: 'preview', NODE_ENV: 'production', VERCEL_URL: 'x.vercel.app', PAYMENT_PROVIDER: 'mock', SHIPROCKET_ALLOW_BOOKING: 'true' })).error ?? '', /SHIPROCKET_ALLOW_BOOKING must be unset or "false" on Preview/, 'Preview never books');
 
   const mockProd = await cfg({ ...VERCEL_PROD, PAYMENT_PROVIDER: 'mock' });
   assert.match(mockProd.error, /cannot be used in production/);
@@ -388,7 +389,7 @@ test('Vercel config: Preview may use the simulator (booking off, pool 2, own htt
   assert.equal((await cfg({ ...VERCEL_PROD, APP_URL: 'https://shop.velberry.example' })).appUrl, 'https://shop.velberry.example', 'APP_URL wins');
   assert.equal((await cfg({ ...VERCEL_PROD, DB_POOL_MAX: '3' })).pool, 3);
   const local = await cfg({});
-  assert.deepEqual([local.appUrl, local.pool, local.serverless, local.expiry], ['http://localhost:3000', 10, false, false]);
+  assert.deepEqual([local.appUrl, local.pool, local.serverless, local.expiry], ['http://localhost:3000', 3, false, false]); // local dev pool: 3 (Stage 1)
 });
 
 test('vercel-build copies three.js into public/ and fails the build on an unsafe production setting', async () => {

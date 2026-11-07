@@ -1,0 +1,16 @@
+{
+  "name": "CLAYSLAY",
+  "short_name": "CLAYSLAY",
+  "description": "Handmade clay keychains and charms — strawberries, sweet treats, florals and little friends, shaped and glazed by hand in India.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#FFF8EE",
+  "theme_color": "#FFF8EE",
+  "icons": [
+    {
+      "src": "/img/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

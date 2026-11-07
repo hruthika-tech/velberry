@@ -119,7 +119,7 @@ test('misconfigured Razorpay is disabled with a reason — never a silent fallba
   assert.notEqual(r.code, 0);
   assert.match(r.out, /cannot be used in production/);
   const liveOk = { NODE_ENV: 'production', PAYMENT_PROVIDER: 'razorpay', RAZORPAY_MODE: 'live', RAZORPAY_KEY_ID: 'rzp_live_abc',
-    RAZORPAY_KEY_SECRET: 's', RAZORPAY_WEBHOOK_SECRET: 'w', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' };
+    RAZORPAY_KEY_SECRET: 's', RAZORPAY_WEBHOOK_SECRET: 'w', SUPABASE_URL: 'https://storage.example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k' };
   for (const APP_URL of [undefined, 'http://velberry.example', 'https://localhost:3000']) {
     r = await configIn({ ...liveOk, ...(APP_URL ? { APP_URL } : {}) });
     assert.notEqual(r.code, 0, `production must refuse APP_URL=${APP_URL}`);

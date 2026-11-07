@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkSupabaseTargets, previewProblems, productionPaymentProblems } from './lib/supabase-target.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -8,10 +9,23 @@ const envFile = path.join(ROOT, '.env');
 if (fs.existsSync(envFile) && !process.env.VELBERRY_SKIP_ENV_FILE) process.loadEnvFile(envFile);
 
 const env = (k, d = '') => (process.env[k] ?? d).toString().trim();
-const isProd = env('NODE_ENV') === 'production';
 // Vercel sets VERCEL=1 and VERCEL_ENV = production | preview | development on every build and function.
 const vercelEnv = env('VERCEL') ? env('VERCEL_ENV', 'production') : null;
 const isPreview = vercelEnv === 'preview';
+const isVercelProduction = vercelEnv === 'production';
+// A real Vercel deployment (Production or Preview) ALWAYS runs with production protections. A NODE_ENV of
+// "development" or "test" there (e.g. copied from a local .env) would silently switch off secure cookies, the
+// https check and the payment-simulator ban — so it is refused outright rather than obeyed.
+if ((isVercelProduction || isPreview) && env('NODE_ENV') && env('NODE_ENV') !== 'production') {
+  throw new Error(`NODE_ENV=${env('NODE_ENV')} is not allowed on a Vercel ${vercelEnv} deployment — remove NODE_ENV from its environment variables (Vercel sets "production" itself)`);
+}
+const isProd = env('NODE_ENV') === 'production' || isVercelProduction || isPreview;
+// Vercel Production takes real money: Razorpay LIVE only — never the simulator, test keys or a missing gateway.
+// Checked before anything else reads the payment settings, and every problem is listed at once.
+if (isVercelProduction) {
+  const problems = productionPaymentProblems(env);
+  if (problems.length) throw new Error(`Payments are not safely configured for Production — refusing to start:\n  • ${problems.join('\n  • ')}`);
+}
 
 export const config = {
   isProd,
@@ -69,7 +83,7 @@ export const config = {
   },
   email: {
     resendKey: env('RESEND_API_KEY'),
-    from: env('EMAIL_FROM', 'Velberry <hello@example.com>'),
+    from: env('EMAIL_FROM', 'CLAYSLAY <hello@example.com>'), // placeholder: set a sender on your Resend-verified domain
     owner: env('SHOP_OWNER_EMAIL'),
   },
   /** Reservation window for unpaid checkouts before stock is released */
@@ -84,6 +98,10 @@ export const config = {
 config.payments = resolvePayments();
 config.razorpay.enabled = config.payments.provider === 'razorpay' && !config.payments.problem;
 config.mockPayments = config.payments.provider === 'mock';
+// Belt and braces: whatever the variables say, the simulator can never be switched on in Vercel Production.
+if (isVercelProduction && (config.mockPayments || config.payments.provider !== 'razorpay' || config.payments.env !== 'live')) {
+  throw new Error('Vercel Production must use Razorpay in live mode — refusing to start');
+}
 // Test-only override so automated tests can talk to a local fake of the Razorpay API (never in production).
 config.razorpay.apiBase = (!isProd && env('RAZORPAY_API_BASE')) || 'https://api.razorpay.com/v1';
 config.shiprocket.enabled = Boolean(config.shiprocket.email && config.shiprocket.password);
@@ -92,6 +110,19 @@ for (const [k, v] of Object.entries(config.parcel)) {
   if (!Number.isFinite(v) || v <= 0 || v > 200 * (k === 'packagingGrams' ? 100 : 1)) throw new Error(`Invalid parcel setting ${k}: ${v}`);
 }
 config.supabase.storageEnabled = Boolean(config.supabase.url && config.supabase.serviceKey);
+
+// ── Safeguards 2 + 3: the database and the storage belong to ONE Supabase project, and never to a project listed
+//    in FORBIDDEN_SUPABASE_REF (set it on Preview to the Production project's ref; Preview refuses to start without it).
+{
+  const t = checkSupabaseTargets({ databaseUrl: env('DATABASE_URL'), supabaseUrl: config.supabase.url, forbidden: env('FORBIDDEN_SUPABASE_REF'), requireForbidden: isPreview });
+  Object.assign(config.supabase, { dbRef: t.dbRef, storageRef: t.storageRef, projectRef: t.dbRef || t.storageRef || null });
+}
+// ── Safeguard 1: a Vercel Preview deployment is a sandbox — simulator payments only, no Razorpay credentials,
+//    no real shipments, no real emails. Production is unaffected.
+if (isPreview) {
+  const problems = previewProblems(env);
+  if (problems.length) throw new Error(`Unsafe Preview configuration — refusing to start:\n  • ${problems.join('\n  • ')}`);
+}
 
 if (isProd && config.sessionSecret.length < 32) {
   throw new Error('SESSION_SECRET must be at least 32 characters in production');
@@ -176,6 +207,12 @@ function dbConfig() {
     if (!caFile) throw new Error('DATABASE_SSL=verify needs DATABASE_CA_CERT (path to the Supabase CA certificate)');
     ssl = { ca: fs.readFileSync(caFile, 'utf8'), rejectUnauthorized: true };
   }
-  // Serverless instances each open their own pool: keep it tiny so many instances can't exhaust Supabase's pooler.
-  return { url, ssl, poolMax: Number(env('DB_POOL_MAX', vercelEnv ? '2' : '10')) };
+  // Every server instance has ONE shared pool, and in Supabase's session pooler each open connection holds one of
+  // its slots (15 by default). Serverless instances each open their own pool, so keep it tiny (2) and close idle
+  // connections after ~5 s (see attachDatabasePool in db/index.js). Local development: 3 connections, 30 s idle.
+  const poolMax = Number(env('DB_POOL_MAX', vercelEnv ? '2' : '3'));
+  const idleTimeoutMs = Number(env('DB_IDLE_TIMEOUT_MS', vercelEnv ? '5000' : '30000'));
+  if (!Number.isInteger(poolMax) || poolMax < 1) throw new Error('DB_POOL_MAX must be a whole number of at least 1');
+  if (!Number.isInteger(idleTimeoutMs) || idleTimeoutMs < 1000) throw new Error('DB_IDLE_TIMEOUT_MS must be a whole number of milliseconds (at least 1000)');
+  return { url, ssl, poolMax, idleTimeoutMs };
 }
