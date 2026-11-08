@@ -3,7 +3,7 @@
  * Pages opt in via <body data-page="…" data-chain="hero|slim|none" data-dock="on|off">.
  */
 import { api, esc } from './api.js';
-import { cart } from './ui.js';
+import { cart, resumePendingAdd } from './ui.js';
 import { mountChain, mountDockChain } from './chain.js';
 import { SITE } from './site-info.js';
 
@@ -99,10 +99,13 @@ export function initLayout() {
     badge.classList.toggle('has-items', n > 0);
     document.querySelector('[data-bag-link]').setAttribute('aria-label', `Shopping bag, ${n} item${n === 1 ? '' : 's'}`);
   });
-  cart.load().catch(() => {});
+  const bagLoaded = cart.load().catch(() => {});
 
-  siteConfig.then((c) => {
-    if (c.user) document.querySelector('[data-account-link]').setAttribute('aria-label', `My account (${c.user.name})`);
+  siteConfig.then(async (c) => {
+    if (!c.user) return;
+    document.querySelector('[data-account-link]').setAttribute('aria-label', `My account (${c.user.name})`);
+    await bagLoaded;
+    resumePendingAdd(); // back from logging in: add the charm they picked before signing in
   });
 }
 

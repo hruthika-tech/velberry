@@ -3,7 +3,7 @@ import { one, all, run, tx, isUniqueViolation } from '../db/index.js';
 import { config } from '../config.js';
 import { validate, addressRules, INDIAN_STATES } from '../lib/validate.js';
 import { bad, conflict, unauthorized, notFound } from '../lib/errors.js';
-import { hashPassword, verifyPassword, createSession, destroySession, requireUser, rateLimit } from '../lib/auth.js';
+import { hashPassword, verifyPassword, createSession, destroySession, requireUser, requireShopper, rateLimit } from '../lib/auth.js';
 import * as catalog from '../services/catalog.js';
 import * as cart from '../services/cart.js';
 import { lookupPincode } from '../services/shipping.js';
@@ -54,7 +54,7 @@ r.post('/auth/signup', rateLimit('signup', { max: 10 }), async (req, res) => {
     throw e;
   }
   await createSession(res, id);
-  await cart.mergeGuestCart(req, res, id);
+  // No guest bag is merged in: shopping starts after login, and a cookie must never pull a stranger's bag into an account.
   res.status(201).json({ ok: true, user: { name: v.name, email, role: 'customer' } });
 });
 
@@ -63,28 +63,28 @@ r.post('/auth/login', rateLimit('login', { max: 12 }), async (req, res) => {
   const u = await one('SELECT * FROM users WHERE email = ?', email);
   if (!u || !verifyPassword(String(req.body?.password || ''), u.password_hash)) throw unauthorized('That email and password don\'t match');
   await createSession(res, u.id);
-  await cart.mergeGuestCart(req, res, u.id);
   res.json({ ok: true, user: { name: u.name, email: u.email, role: u.role } });
 });
 
 r.post('/auth/logout', async (req, res) => { await destroySession(req, res); res.json({ ok: true }); });
 
-/* ───────── cart ───────── */
-r.get('/cart', async (req, res) => res.json(await cart.summarize(await cart.getCart(req, res))));
-r.post('/cart/items', async (req, res) => {
+/* ───────── cart (signed-in customers only; enforced here, not just in the browser) ───────── */
+// Every page asks for the bag count, so a visitor gets an empty bag + loginRequired instead of an error.
+r.get('/cart', async (req, res) => res.json({ ...(await cart.summarize(await cart.getCart(req, res))), loginRequired: !req.user }));
+r.post('/cart/items', requireShopper, async (req, res) => {
   const v = validate(req.body, { productId: { required: true, type: 'int', min: 1 }, variantId: { type: 'int', min: 1 }, quantity: { type: 'int', min: 1, max: cart.MAX_PER_LINE, default: 1 } });
   const c = await cart.getCart(req, res, { create: true });
   await cart.addItem(c, { productId: v.productId, variantId: v.variantId, quantity: v.quantity ?? 1 });
   res.json(await cart.summarize(c));
 });
-r.patch('/cart/items/:id', async (req, res) => {
+r.patch('/cart/items/:id', requireShopper, async (req, res) => {
   const c = await cart.getCart(req, res);
   if (!c) throw bad('Your bag is empty');
   const { quantity } = validate(req.body, { quantity: { required: true, type: 'int', min: 0, max: cart.MAX_PER_LINE } });
   await cart.setQuantity(c, Number(req.params.id) || 0, quantity);
   res.json(await cart.summarize(c));
 });
-r.delete('/cart/items/:id', async (req, res) => {
+r.delete('/cart/items/:id', requireShopper, async (req, res) => {
   const c = await cart.getCart(req, res);
   if (c) await cart.removeItem(c, Number(req.params.id) || 0);
   res.json(await cart.summarize(c));

@@ -1,58 +1,25 @@
 import { one, all, run, tx } from '../db/index.js';
-import { randomToken, setCookie } from '../lib/auth.js';
 import { bad, conflict } from '../lib/errors.js';
 import { resolveLine } from './catalog.js';
 import { estimateShipping } from './shipping.js';
 
-const GUEST_COOKIE = 'vb_cart';
-const GUEST_TOKEN_RE = /^[A-Za-z0-9_-]{32}$/; // randomToken(24) → 32 base64url chars
 export const MAX_PER_LINE = 20;
 
-/** Find (optionally create) the cart for this request: user cart when logged in, else guest cookie cart. */
-export async function getCart(req, res, { create = false } = {}) {
-  if (req.user) {
-    let cart = await one('SELECT * FROM carts WHERE user_id = ?', req.user.id);
-    if (!cart && create) {
-      // ON CONFLICT: two simultaneous first "add to bag" clicks still produce exactly one cart
-      cart = await one(`INSERT INTO carts(user_id) VALUES (?)
-                        ON CONFLICT (user_id) DO UPDATE SET updated_at = now() RETURNING *`, req.user.id);
-    }
-    return cart || null;
-  }
-  // A guest gets their bag token on their first request (every page loads GET /api/cart), before any cart row exists.
-  // Parallel first "add to bag" clicks then all carry the same token and land in ONE cart (ON CONFLICT below).
-  let token = req.cookies.vb_cart;
-  if (!GUEST_TOKEN_RE.test(token || '')) {
-    token = randomToken(24);
-    req.cookies.vb_cart = token;
-    setCookie(res, GUEST_COOKIE, token, { maxAgeDays: 60 });
-  }
-  let cart = await one('SELECT * FROM carts WHERE guest_token = ? AND user_id IS NULL', token);
+/**
+ * The signed-in customer's bag (optionally created). Shopping requires an account: there is no guest bag any more,
+ * so a visitor without a session has no cart at all — nothing is read, created or merged from a browser cookie.
+ * (Old guest-cart rows from before this change are left untouched in the database; they are simply never used.)
+ * The cart is found by the SESSION's user id only, so one customer can never reach another customer's bag.
+ */
+export async function getCart(req, _res, { create = false } = {}) {
+  if (!req.user) return null;
+  let cart = await one('SELECT * FROM carts WHERE user_id = ?', req.user.id);
   if (!cart && create) {
-    cart = await one(`INSERT INTO carts(guest_token) VALUES (?)
-                      ON CONFLICT (guest_token) DO UPDATE SET updated_at = now() RETURNING *`, token);
+    // ON CONFLICT: two simultaneous first "add to bag" clicks still produce exactly one cart
+    cart = await one(`INSERT INTO carts(user_id) VALUES (?)
+                      ON CONFLICT (user_id) DO UPDATE SET updated_at = now() RETURNING *`, req.user.id);
   }
   return cart || null;
-}
-
-/** On login/signup: fold the guest cart into the user's cart (quantities are added, capped by stock). */
-export async function mergeGuestCart(req, res, userId) {
-  const token = req.cookies.vb_cart;
-  if (!token) return;
-  const guest = await one('SELECT * FROM carts WHERE guest_token = ? AND user_id IS NULL', token);
-  if (!guest) return;
-  await tx(async () => {
-    const cart = await one(`INSERT INTO carts(user_id) VALUES (?)
-                            ON CONFLICT (user_id) DO UPDATE SET updated_at = now() RETURNING *`, userId);
-    await one('SELECT id FROM carts WHERE id = ? FOR UPDATE', cart.id);
-    for (const it of await all('SELECT * FROM cart_items WHERE cart_id = ?', guest.id)) {
-      try {
-        await upsertLine(cart.id, it.product_id, it.variant_id, it.quantity, { add: true, clamp: true });
-      } catch { /* item no longer available — skip it */ }
-    }
-    await run('DELETE FROM carts WHERE id = ?', guest.id);
-  });
-  res.append('Set-Cookie', `${GUEST_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`);
 }
 
 async function upsertLine(cartId, productId, variantId, qty, { add = false, clamp = false } = {}) {

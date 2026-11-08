@@ -4,7 +4,13 @@ import { charmSVG } from '../charms.js';
 import { toast, toastError, loaderHTML } from '../ui.js';
 
 const host = $('[data-account]');
-const next = (() => { const n = qs('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : null; })();
+// Only same-site paths are followed after login (never "//evil.com" or "/\evil.com").
+const next = (() => { const n = qs('next'); return n && /^\/(?![/\\])/.test(n) ? n : null; })();
+const REASONS = {
+  bag: 'A little login first! Create your account or sign in to add your favourite charms to your bag.',
+  checkout: 'A little login first! Sign in or create your account to check out — your bag will be right here.',
+};
+const reason = REASONS[qs('reason')] || null;
 const STATUS_CHIP = { delivered: 'green', cancelled: 'red', pending_payment: 'amber', delivery_failed: 'red', rto_initiated: 'red' };
 let states = [];
 
@@ -20,6 +26,7 @@ async function init() {
 function renderAuth(mode = 'login') {
   $('[data-heading]').textContent = mode === 'login' ? 'Welcome back' : 'Join the boutique';
   host.innerHTML = `<div class="auth-card panel stitched">
+    ${reason ? `<p class="notice login-first" role="status">${esc(reason)}</p>` : ''}
     <div class="tabs" role="tablist">
       <button type="button" role="tab" aria-selected="${mode === 'login'}" data-mode="login">Log in</button>
       <button type="button" role="tab" aria-selected="${mode === 'signup'}" data-mode="signup">Create account</button>
@@ -31,7 +38,7 @@ function renderAuth(mode = 'login') {
       <div class="field"><label for="u-pass">Password</label><input id="u-pass" name="password" type="password" autocomplete="${mode === 'login' ? 'current-password' : 'new-password'}" minlength="8" required>${mode === 'signup' ? '<span class="hint">At least 8 characters</span>' : ''}</div>
       <button class="btn btn-block" type="submit">${mode === 'login' ? 'Log in' : 'Create my account'}</button>
     </form>
-    <p class="muted" style="font-size:.86rem;text-align:center;margin:16px 0 0">No account needed to shop — you can always <a href="/shop.html">check out as a guest</a>.</p>
+    <p class="muted" style="font-size:.86rem;text-align:center;margin:16px 0 0">Browsing is open to everyone — an account keeps your bag, addresses and orders together. <a href="/shop.html">Keep browsing</a></p>
   </div>`;
   $$('[data-mode]', host).forEach((b) => b.addEventListener('click', () => renderAuth(b.dataset.mode)));
   const form = $('[data-auth]', host);

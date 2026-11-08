@@ -159,7 +159,7 @@ initGiftBox();
         <p class="menu-desc">${esc(c.description || '')}</p>
         <div class="menu-previews">
           ${c.previews.map((p) => `<a href="/p/${esc(p.slug)}" title="${esc(p.name)}"><img src="${esc(p.image || '')}" alt="${esc(p.name)}" loading="lazy" width="46" height="46"></a>`).join('')}
-          <a class="text-link" href="/collection/${esc(c.slug)}">View collection</a>
+          <a class="menu-cta" href="/collection/${esc(c.slug)}" aria-label="View ${esc(c.name)}" title="View ${esc(c.name)}"><span aria-hidden="true">→</span></a>
         </div>
       </div></div>`).join('');
   } catch (e) { toastError(e); }

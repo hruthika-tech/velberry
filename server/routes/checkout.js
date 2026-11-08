@@ -3,13 +3,15 @@ import { config } from '../config.js';
 import { one, run, withLock } from '../db/index.js';
 import { validate, addressRules } from '../lib/validate.js';
 import { bad, conflict, notFound, forbidden } from '../lib/errors.js';
-import { rateLimit } from '../lib/auth.js';
+import { rateLimit, requireShopper } from '../lib/auth.js';
 import * as cart from '../services/cart.js';
 import * as razorpay from '../services/razorpay.js';
 import { quoteForCheckout } from '../services/shipping.js';
 import { expireStaleCheckoutsThrottled, createPendingOrder, markPaid, recordFailedPayment, recordPayment, transition, findOrderForCustomer } from '../services/orders.js';
 
 const r = Router();
+// Every checkout and payment step needs a signed-in customer (server-side; the browser only redirects for comfort).
+r.use(requireShopper);
 
 async function readyCart(req, res) {
   // Serverless: no background timer releases abandoned checkouts, so do it (throttled) before checking stock.
@@ -52,10 +54,10 @@ r.post('/order', rateLimit('checkout', { max: 30, windowMs: 10 * 60e3 }), async 
 
   const { order, accessToken, reused } = await createPendingOrder({
     lines: s.items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
-    customer, address, userId: req.user?.id, idempotencyKey, giftNote, shippingFee: quote.fee,
+    customer, address, userId: req.user.id, idempotencyKey, giftNote, shippingFee: quote.fee,
   });
 
-  if (req.user && req.body?.saveAddress && !reused) {
+  if (req.body?.saveAddress && !reused) {
     const dup = await one('SELECT 1 FROM addresses WHERE user_id = ? AND line1 = ? AND pincode = ?', req.user.id, address.line1, address.pincode);
     if (!dup) {
       const first = !(await one('SELECT 1 FROM addresses WHERE user_id = ?', req.user.id));
@@ -87,9 +89,10 @@ r.post('/order', rateLimit('checkout', { max: 30, windowMs: 10 * 60e3 }), async 
   });
 });
 
+/** The order being paid must belong to the signed-in customer (an access token or admin role is not enough here). */
 async function orderFromRequest(body, req) {
   const o = await findOrderForCustomer({ orderNumber: body?.orderNumber, token: body?.accessToken, user: req.user });
-  if (!o) throw notFound('Order not found');
+  if (!o || o.user_id !== req.user.id) throw notFound('Order not found');
   return o;
 }
 

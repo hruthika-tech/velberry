@@ -99,13 +99,14 @@ test('full guest journey: reserve stock → idempotent order → verified paymen
   assert.equal((await c('GET', '/api/cart')).data.count, 0, 'cart cleared after payment');
   assert.equal((await c('POST', '/api/checkout/order', { customer, address, idempotencyKey: key })).status, 400, 'empty bag after purchase');
 
-  // Old token was rotated by the idempotent replay
-  assert.equal((await c('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, token: o1.data.accessToken })).status, 404);
-  const view = await c('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, token: o2.data.accessToken });
+  // Old token was rotated by the idempotent replay (checked by someone who is NOT the signed-in owner)
+  const visitor = makeClient(() => app.base, { anonymous: true });
+  assert.equal((await visitor('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, token: o1.data.accessToken })).status, 404);
+  const view = await visitor('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, token: o2.data.accessToken });
   assert.equal(view.data.paymentStatus, 'paid');
   assert.equal(view.data.timeline[1].done, true);
-  assert.equal((await c('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, email: 'ASHA@example.com' })).status, 200);
-  assert.equal((await c('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, email: 'someone@else.com' })).status, 404);
+  assert.equal((await visitor('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, email: 'ASHA@example.com' })).status, 200);
+  assert.equal((await visitor('POST', '/api/orders/lookup', { orderNumber: o1.data.orderNumber, email: 'someone@else.com' })).status, 404);
 
   // Price snapshot survives a price change
   await run('UPDATE products SET price = 99900 WHERE id = ?', daisy.id);
@@ -184,13 +185,17 @@ test('Razorpay webhook: signature required, marks paid once, duplicates ignored'
   assert.equal((await one('SELECT payment_status FROM orders WHERE order_number = ?', o2.data.orderNumber)).payment_status, 'pending');
 });
 
-test('accounts: signup merges guest bag, saved addresses, order history; admin routes protected', async () => {
-  const c = client();
+test('accounts: no guest bag (nothing added or merged before login), saved addresses, order history; admin routes protected', async () => {
+  const c = makeClient(() => app.base, { anonymous: true });
   const shell = (await productBySlug('pearly-seashell'));
-  await c('POST', '/api/cart/items', { productId: shell.id, quantity: 1 });
+  const guestAdd = await c('POST', '/api/cart/items', { productId: shell.id, quantity: 1 });
+  assert.equal(guestAdd.status, 401, 'a signed-out visitor cannot add to a bag');
+  assert.equal(guestAdd.data.details.loginRequired, true);
   const s = await c('POST', '/api/auth/signup', { name: 'Meera', email: 'meera@example.com', password: 'lovely-charms' });
   assert.equal(s.status, 201);
-  assert.equal((await c('GET', '/api/cart')).data.count, 1, 'guest bag merged into account');
+  assert.equal((await c('GET', '/api/cart')).data.count, 0, 'nothing was added or merged before login');
+  await c('POST', '/api/cart/items', { productId: shell.id, quantity: 1 });
+  assert.equal((await c('GET', '/api/cart')).data.count, 1, 'signed in: the charm goes into her own bag');
   assert.equal((await c('GET', '/api/admin/stats')).status, 403);
   await c('POST', '/api/account/addresses', address);
   const { order, pay } = await checkoutAndPay(c);

@@ -69,6 +69,15 @@ export async function sessionMiddleware(req, _res, next) {
 }
 
 export const requireUser = (req, _res, next) => (req.user ? next() : next(unauthorized()));
+
+/** Shopping (bag, checkout, payment) needs a signed-in customer — checked here on the server, never in the browser. */
+export const LOGIN_TO_SHOP = 'A little login first! Create your account or sign in to add your favourite charms to your bag.';
+export const requireShopper = (req, _res, next) => {
+  if (req.user) return next();
+  const e = unauthorized(LOGIN_TO_SHOP);
+  e.details = { loginRequired: true };
+  next(e);
+};
 export const requireAdmin = (req, _res, next) =>
   !req.user ? next(unauthorized()) : req.user.role !== 'admin' ? next(forbidden('Admins only')) : next();
 

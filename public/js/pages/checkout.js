@@ -18,13 +18,15 @@ function hash(s) {
 
 async function init() {
   config = await siteConfig;
+  // Checkout is for signed-in customers (the server refuses every checkout call otherwise); come straight back after.
+  if (!config.user) { location.replace(`/account.html?reason=checkout&next=${encodeURIComponent('/checkout.html')}`); return; }
   const bag = await cart.load();
   if (!bag.items.length) {
     host.innerHTML = `<div class="panel stitched empty-state" style="max-width:520px;margin:0 auto 80px">${charmSVG('teacup', { size: 100 })}<h2>Your bag is empty</h2><a class="btn" href="/shop.html">Explore the Collection</a></div>`;
     return;
   }
   if (bag.items.some((i) => i.problem)) { location.href = '/cart.html'; return; }
-  if (config.user) { try { account = await api('/account'); } catch { /* guest */ } }
+  try { account = await api('/account'); } catch { /* saved details are a convenience; the form still works */ }
   if (config.paymentMode === 'mock') $('[data-test-banner]').innerHTML = '<p class="notice test" style="margin-bottom:18px">🧪 Test mode — payments are simulated locally until Razorpay keys are added.</p>';
   if (config.paymentMode === 'razorpay' && config.paymentEnv === 'test') $('[data-test-banner]').innerHTML = '<p class="notice test" style="margin-bottom:18px">🧪 Razorpay test mode — use Razorpay\'s test cards or UPI IDs. No real money is charged.</p>';
   if (config.paymentMode === 'disabled') $('[data-test-banner]').innerHTML = '<p class="notice error" style="margin-bottom:18px">Payments are not set up yet, so orders can\'t be placed right now.</p>';
@@ -36,9 +38,8 @@ const stateOptions = (sel) => `<option value="">Select state</option>${config.st
 function render(bag) {
   const u = account?.user || config.user;
   const saved = account?.addresses || [];
-  host.innerHTML = `<form class="checkout-layout" novalidate data-form>
-    <div>
-      ${!u ? `<p class="notice" style="margin-bottom:16px">Checking out as a guest — no account needed. <a href="/account.html?next=/checkout.html">Log in</a> to use saved addresses.</p>` : ''}
+  // One column, in the order the customer fills it in: details → address → order summary → payment (last).
+  host.innerHTML = `<form class="checkout-flow" novalidate data-form>
       <section class="panel step">
         <h2><span class="num">1</span>Your details</h2>
         <div class="field"><label for="c-name">Full name</label><input id="c-name" name="name" autocomplete="name" required value="${esc(u?.name || '')}"></div>
@@ -67,27 +68,27 @@ function render(bag) {
             <div class="field"><label for="a-city">City</label><input id="a-city" name="city" autocomplete="shipping address-level2"></div>
             <div class="field"><label for="a-state">State</label><select id="a-state" name="state" autocomplete="shipping address-level1">${stateOptions('')}</select></div>
           </div>
-          ${u ? '<label class="check"><input type="checkbox" name="saveAddress" checked> Save this address to my account</label>' : ''}
+          <label class="check"><input type="checkbox" name="saveAddress" checked> Save this address to my account</label>
         </div>
         <p class="ship-quote" data-quote aria-live="polite"></p>
       </section>
 
-      <section class="panel step">
-        <h2><span class="num">3</span>A little note <span class="muted" style="font-size:.85rem;font-family:var(--f-body)">(optional)</span></h2>
-        <div class="field"><label for="g-note">Gift note — we'll handwrite it on a card</label><textarea id="g-note" name="giftNote" maxlength="300" placeholder="Happy birthday, bestie! ♡"></textarea></div>
+      <section class="panel stitched step co-summary">
+        <h2><span class="num">3</span>Order summary</h2>
+        <ul class="mini-items">${bag.items.map((i) => `<li><img src="${esc(i.image || '')}" alt=""><div>${esc(i.name)}${i.variantName ? ` <span class="muted">· ${esc(i.variantName)}</span>` : ''}<div class="q">Qty ${i.quantity} × ${money(i.unitPrice)}</div></div><span>${money(i.lineTotal)}</span></li>`).join('')}</ul>
+        <p class="co-edit"><a href="/cart.html">← edit bag</a></p>
+        <div class="field"><label for="g-note">Gift note <span class="muted">(optional) — we'll handwrite it on a card</span></label><textarea id="g-note" name="giftNote" maxlength="300" placeholder="Happy birthday, bestie! ♡"></textarea></div>
+        <div class="sum-row"><span>Subtotal</span><span>${money(bag.subtotal)}</span></div>
+        <div class="sum-row"><span>Delivery</span><span data-fee>${bag.shippingEstimate ? money(bag.shippingEstimate) : 'Free'}</span></div>
       </section>
-    </div>
 
-    <aside class="summary panel stitched">
-      <h2>Your bag</h2>
-      <ul class="mini-items">${bag.items.map((i) => `<li><img src="${esc(i.image || '')}" alt=""><div>${esc(i.name)}${i.variantName ? ` <span class="muted">· ${esc(i.variantName)}</span>` : ''}<div class="q">Qty ${i.quantity} × ${money(i.unitPrice)}</div></div><span>${money(i.lineTotal)}</span></li>`).join('')}</ul>
-      <div class="sum-row"><span>Subtotal</span><span>${money(bag.subtotal)}</span></div>
-      <div class="sum-row"><span>Delivery</span><span data-fee>${bag.shippingEstimate ? money(bag.shippingEstimate) : 'Free'}</span></div>
-      <div class="sum-row total"><span>Total</span><span data-total>${money(bag.total)}</span></div>
-      <button class="btn btn-block" type="submit" data-pay style="margin-top:12px" ${config.paymentMode === 'disabled' ? 'disabled' : ''}>Pay <span data-pay-amount>${money(bag.total)}</span> securely</button>
-      <p class="pay-safe">🔒 UPI · Cards · Netbanking · Wallets via Razorpay. Your card details never touch our servers.</p>
-      <p style="text-align:center;margin:8px 0 0;font-size:.88rem"><a href="/cart.html">← edit bag</a></p>
-    </aside>
+      <section class="panel step co-pay">
+        <h2><span class="num">4</span>Payment</h2>
+        <div class="sum-row total"><span>Total to pay</span><span data-total>${money(bag.total)}</span></div>
+        <p class="co-pay-note">The final amount is confirmed by our server for your PIN code before the payment window opens.</p>
+        <button class="btn btn-block" type="submit" data-pay ${config.paymentMode === 'disabled' ? 'disabled' : ''}>Pay <span data-pay-amount>${money(bag.total)}</span> securely</button>
+        <p class="pay-safe">🔒 UPI · Cards · Netbanking · Wallets via Razorpay. Your card details never touch our servers.</p>
+      </section>
   </form>`;
 
   const form = $('[data-form]');
@@ -117,6 +118,15 @@ function render(bag) {
   if (!$('#a-phone').value) $('#a-phone').value = u?.phone || '';
 
   form.addEventListener('submit', (e) => { e.preventDefault(); placeOrder(form, bag); });
+  // A field's error disappears as soon as the customer edits it (the full check runs again on Pay).
+  const clearError = (e) => {
+    const field = e.target.closest?.('.field.has-error');
+    if (!field) return;
+    field.classList.remove('has-error');
+    field.querySelector('.error')?.remove();
+  };
+  form.addEventListener('input', clearError);
+  form.addEventListener('change', clearError);
   refreshQuote();
 
   function chosenAddress() {
@@ -148,11 +158,42 @@ function render(bag) {
   }
 }
 
+/** Same rules as the server (server/lib/validate.js) — checked here first so nobody reaches payment with gaps. */
+const mobile = (v) => /^[6-9]\d{9}$/.test(String(v || '').replace(/[\s-]/g, '').replace(/^(\+91|91|0)(?=\d{10}$)/, ''));
+function checkoutErrors(customer, address) {
+  const e = {};
+  if (!String(customer.name || '').trim()) e.name = 'Please tell us your name';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(customer.email || '').trim())) e.email = 'Enter a valid email';
+  if (!mobile(customer.phone)) e.phone = 'Enter a valid 10-digit Indian mobile number';
+  if (!address.saved) {
+    if (!String(address.name || '').trim()) e.a_name = 'Who is receiving the parcel?';
+    if (!mobile(address.phone)) e.a_phone = 'Enter a valid 10-digit Indian mobile number';
+    if (!String(address.line1 || '').trim()) e.line1 = 'House / street is required';
+    if (!String(address.city || '').trim()) e.city = 'City is required';
+    if (!address.state) e.state = 'Choose your state';
+    if (!/^[1-9]\d{5}$/.test(String(address.pincode || ''))) e.pincode = 'Enter a valid 6-digit PIN code';
+  }
+  return e;
+}
+
 async function placeOrder(form, bag) {
   const btn = $('[data-pay]');
   const f = new FormData(form);
   const customer = { name: f.get('name'), email: f.get('email'), phone: f.get('phone') };
   const address = form.chosenAddress();
+  const errors = checkoutErrors(customer, address);
+  showFieldErrors(form, errors);
+  if (Object.keys(errors).length) {
+    const first = form.querySelector('.field.has-error input, .field.has-error select');
+    first?.focus();
+    first?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    toast({ title: 'A few details are missing', text: 'Please complete your details and delivery address before paying.', error: true });
+    return;
+  }
+  if (!quote) {
+    toast({ title: 'Delivery not confirmed yet', text: 'Please check your PIN code — we confirm delivery and the final total before payment.', error: true });
+    return;
+  }
   const body = {
     customer, address, giftNote: f.get('giftNote') || '', saveAddress: !address.saved && f.get('saveAddress') === 'on',
   };

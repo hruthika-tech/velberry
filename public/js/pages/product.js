@@ -129,10 +129,10 @@ function render(p) {
   }));
   update();
 
-  const add = async (btn) => {
+  const add = async (btn, opts) => {
     btn.classList.add('is-loading');
     try {
-      await cart.add(p.id, variant?.id, qty.value);
+      await cart.add(p.id, variant?.id, qty.value, opts); // signed out → login first, then back here
       return true;
     } catch (e) { toastError(e); return false; } finally { btn.classList.remove('is-loading'); }
   };
@@ -141,7 +141,7 @@ function render(p) {
     if (await add(btn)) celebrateAdd(btn, { image: p.image, name: `${qty.value} × ${p.name}${variant ? ` (${variant.name})` : ''}` });
   });
   $('[data-buy]', host).addEventListener('click', async (e) => {
-    if (await add(e.currentTarget)) location.href = '/checkout.html';
+    if (await add(e.currentTarget, { go: 'checkout' })) location.href = '/checkout.html';
   });
 
   import('../layout.js').then(({ siteConfig }) => siteConfig.then((c) => {

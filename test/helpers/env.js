@@ -61,10 +61,28 @@ export async function setupTestEnv(name, extraEnv = {}) {
   };
 }
 
-/** Minimal browser-like client with a cookie jar. */
-export function makeClient(base) {
+/**
+ * Minimal browser-like client with a cookie jar.
+ * Shopping (bag + checkout) needs a signed-in customer, so unless { anonymous: true } is passed, the client signs in
+ * as a brand-new customer just before its first bag/checkout request — only if it isn't signed in already (a test
+ * that logs in or signs up itself keeps that account). The user + session are created directly in the throwaway test
+ * database, so login/signup rate limits don't skew tests that use many shoppers.
+ */
+export function makeClient(base, { anonymous = false } = {}) {
   const jar = new Map();
-  return async function call(method, url, body, headers = {}) {
+  let signingIn = null;
+  const signIn = () => (signingIn ??= (async () => {
+    const { run } = await import('../../server/db/index.js');
+    const { sha256, randomToken } = await import('../../server/lib/auth.js');
+    const email = `shopper-${crypto.randomBytes(6).toString('hex')}@example.com`;
+    const { id } = await run('INSERT INTO users(email, password_hash, name, phone) VALUES (?,?,?,?)', email, 'test-only-no-password', 'Asha Rao', '9876543210');
+    const token = randomToken(24);
+    await run("INSERT INTO sessions(token_hash, user_id, expires_at) VALUES (?, ?, now() + interval '1 day')", sha256(token), id);
+    jar.set('vb_session', token);
+    call.user = { id, email };
+  })());
+  async function call(method, url, body, headers = {}) {
+    if (!anonymous && !jar.has('vb_session') && /^\/api\/(cart|checkout)\b/.test(url)) await signIn();
     const res = await fetch(base() + url, {
       method,
       headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...headers },
@@ -77,7 +95,9 @@ export function makeClient(base) {
     }
     const data = await res.json().catch(() => null);
     return { status: res.status, data };
-  };
+  }
+  call.jar = jar;
+  return call;
 }
 
 /** Boot the app on a random port; returns { base, close }. */

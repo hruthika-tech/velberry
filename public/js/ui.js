@@ -2,12 +2,51 @@
 import { api, money, esc, reducedMotion, $ } from './api.js';
 import { charmSVG } from './charms.js';
 
-/* ───────── cart store (server is the source of truth; persisted per user / guest cookie) ───────── */
+/* ───────── login before shopping ─────────
+ * Browsing is open to everyone; the bag and checkout need an account. The server enforces it (401 + loginRequired);
+ * here we only make it friendly: send the visitor to log in, remembering exactly what they wanted to add, and add it
+ * once they're back (see resumePendingAdd). Nothing is ever added for a signed-out visitor. */
+const PENDING_ADD = /^(\d{1,9}):(\d{0,9}):(\d{1,2})$/;
+export function goLoginToShop({ add, go } = {}) {
+  const back = new URL(location.href);
+  back.searchParams.delete('add');
+  back.searchParams.delete('go');
+  if (add) back.searchParams.set('add', `${add.productId}:${add.variantId || ''}:${add.quantity || 1}`);
+  if (go === 'checkout') back.searchParams.set('go', go);
+  location.href = `/account.html?reason=bag&next=${encodeURIComponent(back.pathname + back.search + back.hash)}`;
+}
+const never = () => new Promise(() => {}); // keeps the button busy while the browser navigates away
+
+/** After login: complete the add the visitor asked for before signing in (once — the URL is cleaned first). */
+export async function resumePendingAdd() {
+  const url = new URL(location.href);
+  const m = PENDING_ADD.exec(url.searchParams.get('add') || '');
+  const go = url.searchParams.get('go');
+  if (!url.searchParams.has('add')) return;
+  url.searchParams.delete('add');
+  url.searchParams.delete('go');
+  history.replaceState(history.state, '', url.pathname + url.search + url.hash); // a refresh can't add it twice
+  if (!m) return;
+  try {
+    const data = await cart.add(Number(m[1]), m[2] ? Number(m[2]) : null, Number(m[3]));
+    const added = data.items?.find((i) => i.productId === Number(m[1]));
+    toast({ title: 'Added to your bag ♥', text: added?.name || '', image: added?.image, link: { href: '/cart.html', label: 'View bag →' } });
+    if (go === 'checkout') location.href = '/checkout.html';
+  } catch (e) { toastError(e); }
+}
+
+/* ───────── cart store (server is the source of truth; one bag per signed-in customer) ───────── */
 export const cart = {
   data: null,
   async load() { this.data = await api('/cart'); this.emit(); return this.data; },
-  async add(productId, variantId, quantity = 1) {
-    this.data = await api('/cart/items', { method: 'POST', body: { productId, variantId: variantId || undefined, quantity } });
+  async add(productId, variantId, quantity = 1, { go } = {}) {
+    if (this.data?.loginRequired) { goLoginToShop({ add: { productId, variantId, quantity }, go }); return never(); }
+    try {
+      this.data = await api('/cart/items', { method: 'POST', body: { productId, variantId: variantId || undefined, quantity } });
+    } catch (e) {
+      if (e.status === 401 && e.details?.loginRequired) { goLoginToShop({ add: { productId, variantId, quantity }, go }); return never(); }
+      throw e;
+    }
     this.emit();
     return this.data;
   },

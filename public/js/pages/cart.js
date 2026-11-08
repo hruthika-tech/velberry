@@ -69,4 +69,8 @@ function render(data) {
   $$('.is-disabled', host).forEach((a) => a.addEventListener('click', (e) => e.preventDefault()));
 }
 
-document.addEventListener('cart:change', (e) => e.detail && render(e.detail));
+// The bag belongs to a signed-in customer: a visitor is sent to log in and comes straight back here.
+document.addEventListener('cart:change', (e) => {
+  if (e.detail?.loginRequired) { location.replace(`/account.html?reason=bag&next=${encodeURIComponent('/cart.html')}`); return; }
+  if (e.detail) render(e.detail);
+});
