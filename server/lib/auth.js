@@ -61,7 +61,7 @@ export async function sessionMiddleware(req, _res, next) {
   const token = req.cookies[SESSION_COOKIE];
   if (token) {
     const row = await one(
-      `SELECT u.id, u.email, u.name, u.phone, u.role FROM sessions s JOIN users u ON u.id = s.user_id
+      `SELECT u.id, u.email, u.name, u.phone, u.role, u.email_verified_at IS NOT NULL AS email_verified FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > now()`, sha256(token));
     if (row) req.user = row;
   }

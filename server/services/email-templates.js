@@ -126,3 +126,17 @@ export function renderEmail(type, { order, items, shipment, extra, appUrl }) {
   if (!f) throw new Error(`Unknown email type ${type}`);
   return f();
 }
+
+/** "Please confirm your email" — sent at sign-up and when the customer asks for a new link. */
+export function renderVerifyEmail({ name, link, appUrl, hours }) {
+  const first = esc(String(name || '').split(' ')[0] || 'there');
+  return {
+    subject: 'Please confirm your email for CLAYSLAY ✿',
+    html: layout({ appUrl, preheader: 'One tap to confirm your email address', script: 'welcome to the boutique!', title: 'Confirm your email',
+      body: `<p>Hi ${first},</p><p>Thank you for creating your CLAYSLAY account! Please confirm this is your email address so we can
+        reach you about your orders.</p>${button(link, 'Confirm my email')}
+        <p style="font-size:13px;color:#8a6b6b">This link works once and expires in ${hours} hours. If the button doesn't work, copy this
+        address into your browser:<br><a href="${esc(link)}" style="color:${C.guava};word-break:break-all">${esc(link)}</a></p>
+        <p style="font-size:13px;color:#8a6b6b">Didn't create an account? You can safely ignore this email.</p>` }),
+  };
+}

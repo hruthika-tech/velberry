@@ -3,7 +3,7 @@
  * Pages opt in via <body data-page="…" data-chain="hero|slim|none" data-dock="on|off">.
  */
 import { api, esc } from './api.js';
-import { cart, resumePendingAdd } from './ui.js';
+import { cart, resumePendingAdd, toast, toastError } from './ui.js';
 import { mountChain, mountDockChain } from './chain.js';
 import { SITE } from './site-info.js';
 
@@ -61,6 +61,33 @@ function footer() {
   </footer>`;
 }
 
+/** Gentle reminder under the header until the customer confirms their email (hidden for this visit on ×). */
+const HIDE_KEY = 'clayslay-verify-hidden';
+export async function resendVerifyLink(btn) {
+  btn.disabled = true;
+  try {
+    const r = await api('/auth/verify-email/resend', { method: 'POST', body: {} });
+    if (r.alreadyVerified) { location.reload(); return; }
+    toast({ title: 'Link sent!', text: 'Check your inbox (and the spam folder) for an email from CLAYSLAY.', icon: 'heart' });
+  } catch (e) { toastError(e); } finally { btn.disabled = false; }
+}
+function showVerifyReminder(user) {
+  try { if (sessionStorage.getItem(HIDE_KEY)) return; } catch { /* storage blocked: just show it */ }
+  const bar = document.createElement('div');
+  bar.className = 'verify-reminder';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML = `<div class="wrap verify-reminder-inner">
+    <p><b>Please confirm your email.</b> We sent a link to <span class="verify-email-addr">${esc(user.email)}</span> — check your inbox or spam folder.</p>
+    <button type="button" class="link-btn" data-verify-resend>Send a new link</button>
+    <button type="button" class="verify-close" data-verify-hide aria-label="Hide this reminder">×</button></div>`;
+  document.querySelector('.site-header').after(bar);
+  bar.querySelector('[data-verify-resend]').addEventListener('click', (e) => resendVerifyLink(e.currentTarget));
+  bar.querySelector('[data-verify-hide]').addEventListener('click', () => {
+    bar.remove();
+    try { sessionStorage.setItem(HIDE_KEY, '1'); } catch { /* fine */ }
+  });
+}
+
 export function initLayout() {
   const body = document.body;
   const page = body.dataset.page;
@@ -104,6 +131,7 @@ export function initLayout() {
   siteConfig.then(async (c) => {
     if (!c.user) return;
     document.querySelector('[data-account-link]').setAttribute('aria-label', `My account (${c.user.name})`);
+    if (!c.user.emailVerified && c.user.role !== 'admin' && page !== 'verify-email') showVerifyReminder(c.user);
     await bagLoaded;
     resumePendingAdd(); // back from logging in: add the charm they picked before signing in
   });

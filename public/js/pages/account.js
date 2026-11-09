@@ -1,4 +1,4 @@
-import { siteConfig } from '../layout.js';
+import { siteConfig, resendVerifyLink } from '../layout.js';
 import { api, money, esc, fmtDate, qs, $, $$, showFieldErrors } from '../api.js';
 import { charmSVG } from '../charms.js';
 import { toast, toastError, loaderHTML } from '../ui.js';
@@ -49,6 +49,11 @@ function renderAuth(mode = 'login') {
     const body = Object.fromEntries(new FormData(form));
     try {
       const r = await api(mode === 'login' ? '/auth/login' : '/auth/signup', { method: 'POST', body });
+      if (mode === 'signup') {
+        // A short pause so the toast can be read before we move on; the reminder strip on every page takes over from here.
+        toast({ title: 'Welcome to CLAYSLAY!', text: `We've emailed a confirmation link to ${r.user.email}.`, icon: 'heart', ms: 2200 });
+        await new Promise((res) => setTimeout(res, 1200));
+      }
       location.href = next || (r.user.role === 'admin' && !next ? '/admin/' : '/account.html');
     } catch (err) {
       showFieldErrors(form, err.details);
@@ -139,7 +144,10 @@ function addressesPane(pane, data) {
 function profilePane(pane, data) {
   pane.innerHTML = `<h2>Profile</h2><form data-profile novalidate style="max-width:480px">
     <div class="field"><label>Name</label><input name="name" value="${esc(data.user.name)}"></div>
-    <div class="field"><label>Email</label><input value="${esc(data.user.email)}" disabled></div>
+    <div class="field"><label>Email</label><input value="${esc(data.user.email)}" disabled>
+      ${data.user.role === 'admin' ? '' : data.user.emailVerified
+    ? '<span class="hint"><span class="chip green">Confirmed</span></span>'
+    : '<span class="hint"><span class="chip amber">Not confirmed yet</span> <button type="button" class="link-btn" data-verify-resend>Send me a new link</button></span>'}</div>
     <div class="field"><label>Mobile</label><input name="phone" inputmode="numeric" value="${esc(data.user.phone || '')}"></div>
     <hr class="hr-dots">
     <h3>Change password <span class="muted" style="font-size:.85rem;font-family:var(--f-body)">(optional)</span></h3>
@@ -147,6 +155,7 @@ function profilePane(pane, data) {
     <div class="field"><label>New password</label><input name="newPassword" type="password" autocomplete="new-password" minlength="8"></div>
     <button class="btn" type="submit">Save changes</button></form>`;
   const form = $('[data-profile]', pane);
+  $('[data-verify-resend]', form)?.addEventListener('click', (e) => resendVerifyLink(e.currentTarget));
   form.onsubmit = async (e) => {
     e.preventDefault();
     const body = Object.fromEntries(new FormData(form));

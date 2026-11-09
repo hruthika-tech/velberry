@@ -9,6 +9,7 @@ import * as cart from '../services/cart.js';
 import { lookupPincode } from '../services/shipping.js';
 import { orderDetail, findOrderForCustomer } from '../services/orders.js';
 import * as razorpay from '../services/razorpay.js';
+import { issueVerification, confirmVerification, resendVerification } from '../services/verification.js';
 
 const r = Router();
 
@@ -18,7 +19,7 @@ r.get('/config', (req, res) => {
     // Only the public Key ID is ever sent to the browser — never the key secret or webhook secret.
     paymentMode: razorpay.mode(), paymentEnv: razorpay.environment(), razorpayKeyId: config.razorpay.enabled ? config.razorpay.keyId : null,
     freeShippingAbove: config.shipping.freeAbove, flatShipping: config.shipping.flatRate, states: INDIAN_STATES,
-    user: req.user ? { name: req.user.name, email: req.user.email, phone: req.user.phone, role: req.user.role } : null,
+    user: req.user ? { name: req.user.name, email: req.user.email, phone: req.user.phone, role: req.user.role, emailVerified: req.user.email_verified } : null,
   });
 });
 
@@ -43,19 +44,23 @@ r.post('/auth/signup', rateLimit('signup', { max: 10 }), async (req, res) => {
   const email = v.email.toLowerCase();
   let id;
   try {
-    id = await tx(async () => {
-      const u = await run('INSERT INTO users(email, password_hash, name, phone) VALUES (?,?,?,?)', email, hashPassword(v.password), v.name, v.phone);
-      // Link past guest orders made with this email
-      await run('UPDATE orders SET user_id = ? WHERE user_id IS NULL AND lower(customer_email) = ?', u.id, email);
-      return u.id;
-    });
+    // Past guest orders with this email are NOT linked here — typing an email proves nothing. They are linked only
+    // once the customer opens the confirmation link sent to that inbox (services/verification.js → confirmVerification).
+    id = (await run('INSERT INTO users(email, password_hash, name, phone) VALUES (?,?,?,?)', email, hashPassword(v.password), v.name, v.phone)).id;
   } catch (e) {
     if (isUniqueViolation(e)) throw conflict('An account with this email already exists — try logging in');
     throw e;
   }
   await createSession(res, id);
   // No guest bag is merged in: shopping starts after login, and a cookie must never pull a stranger's bag into an account.
-  res.status(201).json({ ok: true, user: { name: v.name, email, role: 'customer' } });
+  // The confirmation email goes out after the response. If even the link can't be created, the account still works:
+  // the customer is reminded on every page and can ask for a new link.
+  let verificationSent = true;
+  try { await issueVerification({ id, email, name: v.name }); } catch (e) {
+    verificationSent = false;
+    console.error('[signup] could not create the email confirmation link:', e.message);
+  }
+  res.status(201).json({ ok: true, verificationSent, user: { name: v.name, email, role: 'customer', emailVerified: false } });
 });
 
 r.post('/auth/login', rateLimit('login', { max: 12 }), async (req, res) => {
@@ -63,7 +68,16 @@ r.post('/auth/login', rateLimit('login', { max: 12 }), async (req, res) => {
   const u = await one('SELECT * FROM users WHERE email = ?', email);
   if (!u || !verifyPassword(String(req.body?.password || ''), u.password_hash)) throw unauthorized('That email and password don\'t match');
   await createSession(res, u.id);
-  res.json({ ok: true, user: { name: u.name, email: u.email, role: u.role } });
+  res.json({ ok: true, user: { name: u.name, email: u.email, role: u.role, emailVerified: Boolean(u.email_verified_at) } });
+});
+
+/* Email confirmation: the link works without being logged in (holding the emailed token is the proof). */
+r.post('/auth/verify-email', rateLimit('verify-email', { max: 30 }), async (req, res) => {
+  await confirmVerification(req.body?.token);
+  res.json({ ok: true });
+});
+r.post('/auth/verify-email/resend', requireUser, rateLimit('verify-resend', { max: 6 }), async (req, res) => {
+  res.json({ ok: true, ...(await resendVerification(req.user.id)) });
 });
 
 r.post('/auth/logout', async (req, res) => { await destroySession(req, res); res.json({ ok: true }); });
@@ -107,7 +121,8 @@ r.get('/account', requireUser, async (req, res) => {
            (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id) AS items
          FROM orders o WHERE user_id = ? AND status <> 'abandoned' ORDER BY id DESC`, req.user.id),
   ]);
-  res.json({ user: req.user, addresses, orders });
+  const { email_verified: emailVerified, ...user } = req.user;
+  res.json({ user: { ...user, emailVerified }, addresses, orders });
 });
 r.patch('/account', requireUser, async (req, res) => {
   const v = validate(req.body, { name: { required: true, max: 80 }, phone: { type: 'phone' } });

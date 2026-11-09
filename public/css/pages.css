@@ -450,3 +450,17 @@
 
 /* "A little login first!" message above the login / sign-up form */
 .auth-card .login-first { margin: 0 0 16px; background: var(--blush); border-color: var(--kobi); color: var(--cocoa); text-align: center; line-height: 1.45; }
+
+/* Email confirmation: reminder strip under the header + the /verify-email page */
+.verify-reminder { position: relative; z-index: 4; background: var(--vanilla); border-bottom: 1px dashed var(--kobi); color: var(--cocoa); font-size: .9rem; }
+.verify-reminder-inner { display: flex; align-items: center; gap: 8px 16px; padding-block: 9px; flex-wrap: wrap; }
+.verify-reminder p { margin: 0; flex: 1 1 260px; line-height: 1.45; }
+.verify-reminder .verify-email-addr { font-weight: 700; overflow-wrap: anywhere; }
+.verify-reminder .link-btn { white-space: nowrap; }
+.verify-reminder .link-btn:disabled { opacity: .55; cursor: wait; }
+.verify-close { background: none; border: 0; font-size: 1.35rem; line-height: 1; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: var(--r-sm); }
+.verify-close:hover, .verify-close:focus-visible { color: var(--guava-deep); background: var(--blush); }
+.verify-wrap { max-width: 620px; margin-inline: auto; padding-bottom: 80px; }
+.verify-card .empty-state { padding: 36px 12px; }
+.verify-card .empty-state p { max-width: 440px; margin-inline: auto; overflow-wrap: anywhere; }
+.verify-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }

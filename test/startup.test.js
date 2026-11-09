@@ -98,9 +98,10 @@ test('npm start on a local database: migrates and opens exactly as before; --pro
     assert.equal(r.opened, true, r.out);
     assert.match(r.out, /startup → target: local \/ non-Supabase database/);
     assert.match(r.out, /applied migration 004_todays_special\.sql/);
+    assert.match(r.out, /applied migration 005_email_verification\.sql/);
     const c = new pg.Client({ connectionString: env.url });
     await c.connect();
-    assert.equal((await c.query('SELECT count(*)::int AS n FROM schema_migrations')).rows[0].n, 4);
+    assert.equal((await c.query('SELECT count(*)::int AS n FROM schema_migrations')).rows[0].n, 5);
     await c.end();
 
     const flagged = await startServer(['--production'], base);

@@ -38,18 +38,24 @@ export async function deliver(orderId, type, extra = {}) {
   }
 
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${config.email.resendKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': `${orderId}-${type}` },
-      body: JSON.stringify({ from: config.email.from, to: [to], subject, html }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.message || `HTTP ${res.status}`);
-    await run("UPDATE notifications SET status = 'sent', provider_id = ? WHERE id = ?", body.id || null, rowId);
+    const providerId = await sendViaResend({ to, subject, html, idempotencyKey: `${orderId}-${type}` });
+    await run("UPDATE notifications SET status = 'sent', provider_id = ? WHERE id = ?", providerId, rowId);
   } catch (e) {
     await run("UPDATE notifications SET status = 'failed', error = ? WHERE id = ?", e.message, rowId);
   }
+}
+
+/** One email through the Resend API. Resolves to Resend's email id; throws with Resend's message on failure. */
+export async function sendViaResend({ to, subject, html, idempotencyKey }) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.email.resendKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ from: config.email.from, to: [to], subject, html }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message || `HTTP ${res.status}`);
+  return body.id || null;
 }
 
 export const NOT_SENT = 'Not sent — no email provider configured (RESEND_API_KEY). Use Preview to see it.';
