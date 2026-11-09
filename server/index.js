@@ -18,6 +18,7 @@ import { expireStaleCheckouts } from './services/orders.js';
 import { syncAllActive } from './services/fulfillment.js';
 import { SECURITY_HEADERS } from './lib/security-headers.js';
 import cron from './routes/cron.js';
+import pages from './routes/pages.js';
 import { settleBackground } from './lib/background.js';
 
 export function createApp() {
@@ -56,10 +57,8 @@ export function createApp() {
   app.use('/api', store);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
-  // Pretty URLs
-  const page = (f) => (_req, res) => res.sendFile(path.join(ROOT, 'public', f));
-  app.get('/p/:slug', page('product.html'));
-  app.get('/collection/:slug', page('shop.html'));
+  // Shopping pages (confirmed customers only) + public share pages — see routes/pages.js
+  app.use(pages);
 
   app.use('/vendor/three', express.static(path.join(ROOT, 'node_modules', 'three', 'build'), { maxAge: '30d' }));
   app.use(express.static(path.join(ROOT, 'public'), { extensions: ['html'], maxAge: config.isProd ? '1h' : 0 }));

@@ -1,5 +1,14 @@
-import '../layout.js';
+import { siteConfig } from '../layout.js';
 import { api, money, esc, reducedMotion, $, $$ } from '../api.js';
+
+/*
+ * The homepage is public. Its charms come from /api/home — a teaser with display fields only — because the full
+ * catalogue is for customers with a confirmed email. Confirmed customers' links open the real product pages; everyone
+ * else's open each charm's public share page (collections stay behind the login + confirmation gate).
+ */
+const teaser = api('/home');
+const canShop = siteConfig.then(({ user }) => Boolean(user && (user.emailVerified || user.role === 'admin'))).catch(() => false);
+const linkFor = (shop) => (p) => (shop ? `/p/${p.slug}` : `/share/product/${p.slug}`);
 import { CHARMS, charmSVG } from '../charms.js';
 import { productCard, bindQuickAdd, loaderHTML, toastError } from '../ui.js';
 import { createModelViewer, FrameSpinner } from '../spin360.js';
@@ -93,10 +102,8 @@ initGiftBox();
   const host = $('[data-featured]');
   host.innerHTML = loaderHTML('Arranging the display case…');
   try {
-    let products = await api('/products?featured=1');
-    if (products.length < 4) products = await api('/products');
-    products = products.slice(0, 8);
-    host.innerHTML = products.map(productCard).join('');
+    const [{ featured: products }, shop] = await Promise.all([teaser, canShop]);
+    host.innerHTML = products.map((p) => productCard(p, { link: linkFor(shop) })).join('');
     bindQuickAdd(host, new Map(products.map((p) => [p.id, p])));
   } catch (e) {
     host.innerHTML = `<p class="notice error">We couldn't load the charms right now. Please refresh in a moment.</p>`;
@@ -109,11 +116,12 @@ initGiftBox();
   const host = $('[data-viewer]');
   const buy = $('[data-showcase-buy]');
   let product = null;
-  try { product = await api('/products/strawberry-shortcake-charm'); } catch { /* product removed by admin */ }
+  let shop = false;
+  try { [{ showcase: product }, shop] = await Promise.all([teaser, canShop]); } catch { /* teaser unavailable */ }
 
   if (product) {
     buy.innerHTML = `<span class="price">${money(Math.min(product.price, ...product.variants.map((v) => v.price)))}</span>
-      <a class="btn" href="/p/${esc(product.slug)}"><span class="heart">♥</span> ${product.variants.length ? 'Choose your berry' : 'Add to Bag'}</a>
+      <a class="btn" href="${esc(linkFor(shop)(product))}"><span class="heart">♥</span> ${product.variants.length ? 'Choose your berry' : 'Add to Bag'}</a>
       <span class="stock ${product.availability.status}">${esc(product.availability.label)}</span>`;
   } else {
     buy.innerHTML = '<a class="btn" href="/shop.html">Browse the boutique</a>';
@@ -150,7 +158,8 @@ initGiftBox();
 (async function menu() {
   const host = $('[data-menu]');
   try {
-    const cats = (await api('/categories')).filter((c) => c.productCount > 0);
+    const [{ categories: cats }, shop] = await Promise.all([teaser, canShop]);
+    const productLink = linkFor(shop);
     host.innerHTML = cats.map((c) => `<div class="menu-item">
       <div class="menu-icon">${charmSVG(c.icon, { size: 40 })}</div>
       <div>
@@ -158,7 +167,7 @@ initGiftBox();
           <span class="menu-price">${c.fromPrice != null ? `from ${money(c.fromPrice)}` : ''}</span></div>
         <p class="menu-desc">${esc(c.description || '')}</p>
         <div class="menu-previews">
-          ${c.previews.map((p) => `<a href="/p/${esc(p.slug)}" title="${esc(p.name)}"><img src="${esc(p.image || '')}" alt="${esc(p.name)}" loading="lazy" width="46" height="46"></a>`).join('')}
+          ${c.previews.map((p) => `<a href="${esc(productLink(p))}" title="${esc(p.name)}"><img src="${esc(p.image || '')}" alt="${esc(p.name)}" loading="lazy" width="46" height="46"></a>`).join('')}
           <a class="menu-cta" href="/collection/${esc(c.slug)}" aria-label="View ${esc(c.name)}" title="View ${esc(c.name)}"><span aria-hidden="true">→</span></a>
         </div>
       </div></div>`).join('');

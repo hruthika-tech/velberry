@@ -9,16 +9,21 @@ const next = (() => { const n = qs('next'); return n && /^\/(?![/\\])/.test(n) ?
 const REASONS = {
   bag: 'A little login first! Create your account or sign in to add your favourite charms to your bag.',
   checkout: 'A little login first! Sign in or create your account to check out — your bag will be right here.',
+  browse: 'The boutique is for CLAYSLAY members ♡ Create your free account (or sign in) and confirm your email to explore every charm.',
 };
 const reason = REASONS[qs('reason')] || null;
 const STATUS_CHIP = { delivered: 'green', cancelled: 'red', pending_payment: 'amber', delivery_failed: 'red', rto_initiated: 'red' };
 let states = [];
+const canShop = (u) => u.emailVerified || u.role === 'admin';
+/** Signed in but not confirmed yet → the "confirm your email" page (it carries on to `next` afterwards). */
+const toPending = () => location.replace(`/verify-pending.html${next ? `?next=${encodeURIComponent(next)}` : ''}`);
 
 async function init() {
   host.innerHTML = loaderHTML();
   const cfg = await siteConfig;
   states = cfg.states || [];
   if (!cfg.user) return renderAuth();
+  if (!canShop(cfg.user)) return toPending();
   try { renderAccount(await api('/account')); } catch { renderAuth(); }
 }
 
@@ -38,7 +43,7 @@ function renderAuth(mode = 'login') {
       <div class="field"><label for="u-pass">Password</label><input id="u-pass" name="password" type="password" autocomplete="${mode === 'login' ? 'current-password' : 'new-password'}" minlength="8" required>${mode === 'signup' ? '<span class="hint">At least 8 characters</span>' : ''}</div>
       <button class="btn btn-block" type="submit">${mode === 'login' ? 'Log in' : 'Create my account'}</button>
     </form>
-    <p class="muted" style="font-size:.86rem;text-align:center;margin:16px 0 0">Browsing is open to everyone — an account keeps your bag, addresses and orders together. <a href="/shop.html">Keep browsing</a></p>
+    <p class="muted" style="font-size:.86rem;text-align:center;margin:16px 0 0">A free account (with a confirmed email) unlocks the whole boutique and keeps your bag, addresses and orders together. <a href="/">Back to the homepage</a></p>
   </div>`;
   $$('[data-mode]', host).forEach((b) => b.addEventListener('click', () => renderAuth(b.dataset.mode)));
   const form = $('[data-auth]', host);
@@ -47,14 +52,12 @@ function renderAuth(mode = 'login') {
     const btn = $('button[type=submit]', form);
     btn.classList.add('is-loading');
     const body = Object.fromEntries(new FormData(form));
+    if (mode === 'signup' && next) body.next = next; // the confirmation link brings them back here (checked again by the server)
     try {
       const r = await api(mode === 'login' ? '/auth/login' : '/auth/signup', { method: 'POST', body });
-      if (mode === 'signup') {
-        // A short pause so the toast can be read before we move on; the reminder strip on every page takes over from here.
-        toast({ title: 'Welcome to CLAYSLAY!', text: `We've emailed a confirmation link to ${r.user.email}.`, icon: 'heart', ms: 2200 });
-        await new Promise((res) => setTimeout(res, 1200));
-      }
-      location.href = next || (r.user.role === 'admin' && !next ? '/admin/' : '/account.html');
+      // New accounts and unconfirmed logins wait on the confirmation page (no extra email is sent on login).
+      if (!canShop(r.user)) { toPending(); return; }
+      location.href = next || (r.user.role === 'admin' ? '/admin/' : '/account.html');
     } catch (err) {
       showFieldErrors(form, err.details);
       toastError(err);

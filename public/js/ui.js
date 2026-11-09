@@ -7,14 +7,17 @@ import { charmSVG } from './charms.js';
  * here we only make it friendly: send the visitor to log in, remembering exactly what they wanted to add, and add it
  * once they're back (see resumePendingAdd). Nothing is ever added for a signed-out visitor. */
 const PENDING_ADD = /^(\d{1,9}):(\d{0,9}):(\d{1,2})$/;
-export function goLoginToShop({ add, go } = {}) {
+function comeBackTo({ add, go } = {}) {
   const back = new URL(location.href);
   back.searchParams.delete('add');
   back.searchParams.delete('go');
   if (add) back.searchParams.set('add', `${add.productId}:${add.variantId || ''}:${add.quantity || 1}`);
   if (go === 'checkout') back.searchParams.set('go', go);
-  location.href = `/account.html?reason=bag&next=${encodeURIComponent(back.pathname + back.search + back.hash)}`;
+  return encodeURIComponent(back.pathname + back.search + back.hash);
 }
+export function goLoginToShop(opts) { location.href = `/account.html?reason=bag&next=${comeBackTo(opts)}`; }
+/** Signed in but the email isn't confirmed yet → the "confirm your email" page, then straight back here. */
+export function goVerifyToShop(opts) { location.href = `/verify-pending.html?next=${comeBackTo(opts)}`; }
 const never = () => new Promise(() => {}); // keeps the button busy while the browser navigates away
 
 /** After login: complete the add the visitor asked for before signing in (once — the URL is cleaned first). */
@@ -40,11 +43,14 @@ export const cart = {
   data: null,
   async load() { this.data = await api('/cart'); this.emit(); return this.data; },
   async add(productId, variantId, quantity = 1, { go } = {}) {
-    if (this.data?.loginRequired) { goLoginToShop({ add: { productId, variantId, quantity }, go }); return never(); }
+    const want = { add: { productId, variantId, quantity }, go };
+    if (this.data?.loginRequired) { goLoginToShop(want); return never(); }
+    if (this.data?.verificationRequired) { goVerifyToShop(want); return never(); }
     try {
       this.data = await api('/cart/items', { method: 'POST', body: { productId, variantId: variantId || undefined, quantity } });
     } catch (e) {
-      if (e.status === 401 && e.details?.loginRequired) { goLoginToShop({ add: { productId, variantId, quantity }, go }); return never(); }
+      if (e.status === 401 && e.details?.loginRequired) { goLoginToShop(want); return never(); }
+      if (e.status === 403 && e.details?.verificationRequired) { goVerifyToShop(want); return never(); }
       throw e;
     }
     this.emit();
@@ -122,7 +128,9 @@ export function celebrateAdd(fromEl, { image, name }) {
 }
 
 /* ───────── product card ───────── */
-export function productCard(p) {
+/** link: where the card's title/buttons go (the homepage sends visitors to the public share page instead of the shop). */
+export function productCard(p, { link = (x) => `/p/${x.slug}` } = {}) {
+  const href = esc(link(p));
   const soldOut = p.availability.status === 'sold_out';
   const needsChoice = p.variants?.length > 0;
   const second = p.images?.[1]?.url;
@@ -135,7 +143,7 @@ export function productCard(p) {
       ${second ? `<img class="alt" src="${esc(second)}" alt="" loading="lazy" width="600" height="600">` : ''}
     </div>
     <div class="pc-body">
-      <h3 class="pc-title"><a href="/p/${esc(p.slug)}">${esc(p.name)}</a></h3>
+      <h3 class="pc-title"><a href="${href}">${esc(p.name)}</a></h3>
       <p class="pc-desc">${esc(p.shortDesc)}</p>
       <div class="pc-meta">
         <span class="price">${needsChoice && p.variants.some((v) => v.price !== p.price) ? 'from ' : ''}${money(Math.min(p.price, ...(p.variants || []).map((v) => v.price)))}${onSale ? `<s>${money(p.comparePrice)}</s>` : ''}</span>
@@ -143,11 +151,11 @@ export function productCard(p) {
       </div>
       <div class="pc-actions">
         ${soldOut
-          ? `<a class="btn btn-ghost btn-sm" href="/p/${esc(p.slug)}">View details</a>`
+          ? `<a class="btn btn-ghost btn-sm" href="${href}">View details</a>`
           : needsChoice
-            ? `<a class="btn btn-sm" href="/p/${esc(p.slug)}">Choose a style</a>`
+            ? `<a class="btn btn-sm" href="${href}">Choose a style</a>`
             : `<button class="btn btn-sm" type="button" data-add="${p.id}"><span class="heart">♥</span> Add to Bag</button>
-               <a class="btn btn-ghost btn-sm" href="/p/${esc(p.slug)}" aria-label="View details of ${esc(p.name)}">Details</a>`}
+               <a class="btn btn-ghost btn-sm" href="${href}" aria-label="View details of ${esc(p.name)}">Details</a>`}
       </div>
     </div>
   </article>`;

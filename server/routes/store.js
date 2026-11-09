@@ -3,13 +3,14 @@ import { one, all, run, tx, isUniqueViolation } from '../db/index.js';
 import { config } from '../config.js';
 import { validate, addressRules, INDIAN_STATES } from '../lib/validate.js';
 import { bad, conflict, unauthorized, notFound } from '../lib/errors.js';
-import { hashPassword, verifyPassword, createSession, destroySession, requireUser, requireShopper, rateLimit } from '../lib/auth.js';
+import { hashPassword, verifyPassword, createSession, destroySession, requireUser, requireShopper, shoppingAccess, rateLimit } from '../lib/auth.js';
 import * as catalog from '../services/catalog.js';
 import * as cart from '../services/cart.js';
 import { lookupPincode } from '../services/shipping.js';
 import { orderDetail, findOrderForCustomer } from '../services/orders.js';
 import * as razorpay from '../services/razorpay.js';
-import { issueVerification, confirmVerification, resendVerification } from '../services/verification.js';
+import { issueVerification, confirmVerification, resendVerification, verificationStatus, safeNext } from '../services/verification.js';
+import { homeTeaser, shareUrl } from '../services/public-catalog.js';
 
 const r = Router();
 
@@ -23,17 +24,20 @@ r.get('/config', (req, res) => {
   });
 });
 
-/* ───────── catalog ───────── */
-r.get('/categories', async (_req, res) => res.json(await catalog.listCategories()));
-r.get('/products', async (req, res) => {
+/* ───────── public homepage teaser (safe display fields only — see services/public-catalog.js) ───────── */
+r.get('/home', async (_req, res) => res.json(await homeTeaser()));
+
+/* ───────── catalog: confirmed customers only (listings, search, collections, product pages) ───────── */
+r.get('/categories', requireShopper, async (_req, res) => res.json(await catalog.listCategories()));
+r.get('/products', requireShopper, async (req, res) => {
   const { category, featured, q, sort } = req.query;
   res.json(await catalog.listProducts({ category, featured: featured === '1', q: q ? String(q).slice(0, 60) : '', sort }));
 });
-r.get('/products/:slug', async (req, res) => {
+r.get('/products/:slug', requireShopper, async (req, res) => {
   const p = await catalog.getProduct(req.params.slug);
-  res.json({ ...p, related: await catalog.relatedProducts(p) });
+  res.json({ ...p, shareUrl: shareUrl(p.slug), related: await catalog.relatedProducts(p) });
 });
-r.get('/pincode/:pin', async (req, res) => res.json(await lookupPincode(req.params.pin)));
+r.get('/pincode/:pin', requireShopper, async (req, res) => res.json(await lookupPincode(req.params.pin)));
 
 /* ───────── auth ───────── */
 r.post('/auth/signup', rateLimit('signup', { max: 10 }), async (req, res) => {
@@ -56,7 +60,7 @@ r.post('/auth/signup', rateLimit('signup', { max: 10 }), async (req, res) => {
   // The confirmation email goes out after the response. If even the link can't be created, the account still works:
   // the customer is reminded on every page and can ask for a new link.
   let verificationSent = true;
-  try { await issueVerification({ id, email, name: v.name }); } catch (e) {
+  try { await issueVerification({ id, email, name: v.name }, { next: safeNext(req.body?.next) }); } catch (e) {
     verificationSent = false;
     console.error('[signup] could not create the email confirmation link:', e.message);
   }
@@ -76,15 +80,22 @@ r.post('/auth/verify-email', rateLimit('verify-email', { max: 30 }), async (req,
   await confirmVerification(req.body?.token);
   res.json({ ok: true });
 });
+// Whether a confirmation link was ever sent (pre-verification accounts haven't had one). Read-only, sends nothing.
+r.get('/auth/verify-email/status', requireUser, async (req, res) => res.json(await verificationStatus(req.user.id)));
 r.post('/auth/verify-email/resend', requireUser, rateLimit('verify-resend', { max: 6 }), async (req, res) => {
-  res.json({ ok: true, ...(await resendVerification(req.user.id)) });
+  res.json({ ok: true, ...(await resendVerification(req.user.id, { next: safeNext(req.body?.next) })) });
 });
 
 r.post('/auth/logout', async (req, res) => { await destroySession(req, res); res.json({ ok: true }); });
 
 /* ───────── cart (signed-in customers only; enforced here, not just in the browser) ───────── */
 // Every page asks for the bag count, so a visitor gets an empty bag + loginRequired instead of an error.
-r.get('/cart', async (req, res) => res.json({ ...(await cart.summarize(await cart.getCart(req, res))), loginRequired: !req.user }));
+// Only a confirmed customer's bag is ever read: everyone else gets an empty bag + the reason (no bag rows are touched).
+r.get('/cart', async (req, res) => {
+  const access = shoppingAccess(req.user);
+  if (access !== 'ok') return res.json({ ...(await cart.summarize(null)), loginRequired: access === 'login', verificationRequired: access === 'verify' });
+  res.json({ ...(await cart.summarize(await cart.getCart(req, res))), loginRequired: false, verificationRequired: false });
+});
 r.post('/cart/items', requireShopper, async (req, res) => {
   const v = validate(req.body, { productId: { required: true, type: 'int', min: 1 }, variantId: { type: 'int', min: 1 }, quantity: { type: 'int', min: 1, max: cart.MAX_PER_LINE, default: 1 } });
   const c = await cart.getCart(req, res, { create: true });
@@ -112,7 +123,8 @@ r.post('/orders/lookup', rateLimit('lookup', { max: 30 }), async (req, res) => {
   res.json(await orderDetail(o.id));
 });
 
-/* ───────── account (every query is scoped to the logged-in user's id) ───────── */
+/* ───────── account (confirmed customers only; every query is scoped to the logged-in user's id) ───────── */
+r.use('/account', requireShopper);
 r.get('/account', requireUser, async (req, res) => {
   const [addresses, orders] = await Promise.all([
     all('SELECT * FROM addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC', req.user.id),

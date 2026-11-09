@@ -127,6 +127,8 @@ test('an account created before the rebrand (stored hash) still logs in, keeps i
   assert.equal((await c('POST', '/api/auth/login', { email, password: 'wrong-password' })).status, 401);
 
   assert.equal((await c('POST', '/api/auth/login', { email, password: 'old-password-123' })).status, 200);
+  assert.equal((await c('GET', '/api/products')).status, 403, 'an existing account confirms its email once before shopping');
+  await run('UPDATE users SET email_verified_at = now() WHERE id = ?', id); // what opening the emailed link does
   const p = await one("SELECT id FROM products WHERE slug = 'cherry-twins'");
   await run('UPDATE products SET stock = GREATEST(stock, 50), sold_out = false WHERE id = ?', p.id);
   await c('POST', '/api/cart/items', { productId: p.id, quantity: 1 });

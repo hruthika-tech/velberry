@@ -63,26 +63,29 @@ export async function setupTestEnv(name, extraEnv = {}) {
 
 /**
  * Minimal browser-like client with a cookie jar.
- * Shopping (bag + checkout) needs a signed-in customer, so unless { anonymous: true } is passed, the client signs in
- * as a brand-new customer just before its first bag/checkout request — only if it isn't signed in already (a test
- * that logs in or signs up itself keeps that account). The user + session are created directly in the throwaway test
- * database, so login/signup rate limits don't skew tests that use many shoppers.
+ * The shopping experience (catalogue, bag, checkout, account) needs a signed-in customer with a CONFIRMED email, so
+ * unless { anonymous: true } is passed, the client signs in as a brand-new confirmed customer just before its first
+ * such request — only if it isn't signed in already (a test that logs in or signs up itself keeps that account, and
+ * must confirm it like a real customer). { unverified: true } makes the auto-created customer unconfirmed instead.
+ * The user + session are created directly in the throwaway test database, so login/signup rate limits don't skew
+ * tests that use many shoppers.
  */
-export function makeClient(base, { anonymous = false } = {}) {
+export function makeClient(base, { anonymous = false, unverified = false } = {}) {
   const jar = new Map();
   let signingIn = null;
   const signIn = () => (signingIn ??= (async () => {
     const { run } = await import('../../server/db/index.js');
     const { sha256, randomToken } = await import('../../server/lib/auth.js');
     const email = `shopper-${crypto.randomBytes(6).toString('hex')}@example.com`;
-    const { id } = await run('INSERT INTO users(email, password_hash, name, phone) VALUES (?,?,?,?)', email, 'test-only-no-password', 'Asha Rao', '9876543210');
+    const { id } = await run(`INSERT INTO users(email, password_hash, name, phone, email_verified_at) VALUES (?,?,?,?, ${unverified ? 'NULL' : 'now()'})`,
+      email, 'test-only-no-password', 'Asha Rao', '9876543210');
     const token = randomToken(24);
     await run("INSERT INTO sessions(token_hash, user_id, expires_at) VALUES (?, ?, now() + interval '1 day')", sha256(token), id);
     jar.set('vb_session', token);
     call.user = { id, email };
   })());
   async function call(method, url, body, headers = {}) {
-    if (!anonymous && !jar.has('vb_session') && /^\/api\/(cart|checkout)\b/.test(url)) await signIn();
+    if (!anonymous && !jar.has('vb_session') && /^\/api\/(cart|checkout|products|categories|account|pincode)\b/.test(url)) await signIn();
     const res = await fetch(base() + url, {
       method,
       headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...headers },
@@ -112,6 +115,13 @@ export async function startApp() {
   const server = createApp().listen(0);
   await new Promise((r) => server.once('listening', r));
   return { base: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => server.close(r)) };
+}
+
+/** What clicking the emailed link does, for tests that sign up through the real API and then go shopping. */
+export async function confirmEmail(userIdOrEmail) {
+  const { run } = await import('../../server/db/index.js');
+  const col = typeof userIdOrEmail === 'number' ? 'id' : 'email';
+  await run(`UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE ${col} = ?`, userIdOrEmail);
 }
 
 export const customer = { name: 'Asha Rao', email: 'asha@example.com', phone: '9876543210' };

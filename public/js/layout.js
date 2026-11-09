@@ -77,7 +77,8 @@ function showVerifyReminder(user) {
   bar.className = 'verify-reminder';
   bar.setAttribute('role', 'status');
   bar.innerHTML = `<div class="wrap verify-reminder-inner">
-    <p><b>Please confirm your email.</b> We sent a link to <span class="verify-email-addr">${esc(user.email)}</span> — check your inbox or spam folder.</p>
+    <p><b>Confirm your email to unlock the boutique.</b> We sent a link to <span class="verify-email-addr">${esc(user.email)}</span> — check your inbox or spam folder.</p>
+    <a class="link-btn" href="/verify-pending.html">What do I do?</a>
     <button type="button" class="link-btn" data-verify-resend>Send a new link</button>
     <button type="button" class="verify-close" data-verify-hide aria-label="Hide this reminder">×</button></div>`;
   document.querySelector('.site-header').after(bar);
@@ -131,7 +132,7 @@ export function initLayout() {
   siteConfig.then(async (c) => {
     if (!c.user) return;
     document.querySelector('[data-account-link]').setAttribute('aria-label', `My account (${c.user.name})`);
-    if (!c.user.emailVerified && c.user.role !== 'admin' && page !== 'verify-email') showVerifyReminder(c.user);
+    if (!c.user.emailVerified && c.user.role !== 'admin' && !['verify-email', 'verify-pending'].includes(page)) showVerifyReminder(c.user);
     await bagLoaded;
     resumePendingAdd(); // back from logging in: add the charm they picked before signing in
   });

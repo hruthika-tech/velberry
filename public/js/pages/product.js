@@ -3,6 +3,7 @@ import { api, money, esc, qs, $, $$ } from '../api.js';
 import { charmSVG } from '../charms.js';
 import { cart, celebrateAdd, toastError, productCard, bindQuickAdd, stepper, loaderHTML } from '../ui.js';
 import { FrameSpinner } from '../spin360.js';
+import { shareCharm, SHARE_ICON } from '../share.js';
 
 const slug = location.pathname.match(/^\/p\/([\w-]+)/)?.[1] || qs('slug');
 const host = $('[data-product]');
@@ -56,8 +57,9 @@ function render(p) {
         </div>` : ''}
       <div class="opt-label">Quantity</div>
       <div class="buy-row"><div data-stepper></div><div class="line-total" data-line aria-live="polite"></div></div>
-      <div class="buy-buttons">
+      <div class="buy-buttons has-share">
         <button class="btn" type="button" data-add><span class="heart">♥</span> Add to Bag</button>
+        <button class="share-btn" type="button" data-share aria-label="Share this charm" title="Share this charm">${SHARE_ICON}</button>
         <button class="btn btn-matcha" type="button" data-buy>Buy Now</button>
       </div>
       <div class="perks"><div><b>✿</b>Handmade<br>to last</div><div><b>♡</b>Gift-ready<br>packaging</div><div><b>✈</b>Tracked<br>delivery</div></div>
@@ -143,6 +145,8 @@ function render(p) {
   $('[data-buy]', host).addEventListener('click', async (e) => {
     if (await add(e.currentTarget, { go: 'checkout' })) location.href = '/checkout.html';
   });
+  // The public share link (built by the server from APP_URL) — opens for anyone, even without an account.
+  $('[data-share]', host).addEventListener('click', () => shareCharm({ title: `${p.name} — CLAYSLAY`, text: p.shortDesc || p.name, url: p.shareUrl }));
 
   import('../layout.js').then(({ siteConfig }) => siteConfig.then((c) => {
     if (c.freeShippingAbove) $('[data-ship-note]', host).textContent = `Free delivery on orders above ${money(c.freeShippingAbove)}.`;

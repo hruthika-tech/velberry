@@ -72,5 +72,6 @@ function render(data) {
 // The bag belongs to a signed-in customer: a visitor is sent to log in and comes straight back here.
 document.addEventListener('cart:change', (e) => {
   if (e.detail?.loginRequired) { location.replace(`/account.html?reason=bag&next=${encodeURIComponent('/cart.html')}`); return; }
+  if (e.detail?.verificationRequired) { location.replace(`/verify-pending.html?next=${encodeURIComponent('/cart.html')}`); return; }
   if (e.detail) render(e.detail);
 });

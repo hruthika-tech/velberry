@@ -70,12 +70,26 @@ export async function sessionMiddleware(req, _res, next) {
 
 export const requireUser = (req, _res, next) => (req.user ? next() : next(unauthorized()));
 
-/** Shopping (bag, checkout, payment) needs a signed-in customer — checked here on the server, never in the browser. */
+/**
+ * The shopping experience (catalogue, product pages, bag, checkout, account) needs a signed-in customer whose email is
+ * CONFIRMED. Checked here on the server on every request: req.user.email_verified comes from the users table
+ * (sessionMiddleware), never from anything the browser sends. Admins are not customers and are never gated.
+ */
 export const LOGIN_TO_SHOP = 'A little login first! Create your account or sign in to add your favourite charms to your bag.';
+export const VERIFY_TO_SHOP = 'One little step before the magic begins! Please confirm your email address to unlock the CLAYSLAY boutique.';
+export const isVerified = (user) => Boolean(user && (user.role === 'admin' || user.email_verified));
+/** 'ok' | 'login' (nobody signed in) | 'verify' (signed in, email not confirmed yet) */
+export const shoppingAccess = (user) => (!user ? 'login' : isVerified(user) ? 'ok' : 'verify');
 export const requireShopper = (req, _res, next) => {
-  if (req.user) return next();
-  const e = unauthorized(LOGIN_TO_SHOP);
-  e.details = { loginRequired: true };
+  const access = shoppingAccess(req.user);
+  if (access === 'ok') return next();
+  if (access === 'login') {
+    const e = unauthorized(LOGIN_TO_SHOP);
+    e.details = { loginRequired: true };
+    return next(e);
+  }
+  const e = forbidden(VERIFY_TO_SHOP);
+  e.details = { verificationRequired: true };
   next(e);
 };
 export const requireAdmin = (req, _res, next) =>

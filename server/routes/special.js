@@ -30,12 +30,15 @@ async function productsById(ids, { liveOnly, admin = false }) {
 }
 
 /** What the board shows for one product — the original photo URL, untouched. */
-const boardCard = (p) => {
+const boardCard = (p, { admin = false } = {}) => {
   const prices = [p.price, ...p.variants.map((v) => v.price)];
   return {
     id: p.id, slug: p.slug, name: p.name, shortDesc: p.shortDesc,
     price: Math.min(...prices), fromPrice: new Set(prices).size > 1, comparePrice: p.comparePrice,
-    image: p.image, imageAlt: p.images[0]?.alt || p.name, category: p.category?.name || null, availability: p.availability,
+    image: p.image, imageAlt: p.images[0]?.alt || p.name, category: p.category?.name || null,
+    // The public homepage board says only "In stock" / "Sold out" — never "Only N left" (stock levels stay private).
+    availability: admin ? p.availability
+      : p.availability.status === 'sold_out' ? { status: 'sold_out', label: 'Sold out' } : { status: 'in_stock', label: 'In stock' },
   };
 };
 
@@ -65,7 +68,7 @@ async function adminView() {
       const p = id ? byId.get(id) : null;
       // FK is ON DELETE SET NULL, so a deleted product shows up as an empty slot.
       const problem = !id ? 'empty' : !p ? 'deleted' : !p.isActive ? 'hidden' : p.availability.status === 'sold_out' ? 'sold_out' : null;
-      return { position: i + 1, productId: id, product: p ? { ...boardCard(p), isActive: p.isActive } : null, problem };
+      return { position: i + 1, productId: id, product: p ? { ...boardCard(p, { admin: true }), isActive: p.isActive } : null, problem };
     }),
   };
 }

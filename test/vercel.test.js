@@ -318,7 +318,8 @@ test('api/index.js serves the app, and answers 503 (without changing the schema)
     const h = await fetch(`${ok.base}/healthz`);
     assert.equal(h.status, 200);
     assert.equal((await h.json()).ok, true);
-    assert.equal((await fetch(`${ok.base}/api/products`)).status, 200);
+    assert.equal((await fetch(`${ok.base}/api/home`)).status, 200);
+    assert.equal((await fetch(`${ok.base}/api/products`)).status, 401, 'the catalogue needs a confirmed customer');
     assert.equal((await fetch(`${ok.base}/api/cron/all`)).status, 401);
   } finally { await ok.close(); }
 

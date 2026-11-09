@@ -25,12 +25,24 @@ export const INVALID_LINK = 'This confirmation link has expired or was already u
 export const TOO_SOON = 'We just sent you a link — please check your inbox (and spam folder), or try again in a minute';
 export const DAILY_LIMIT_REACHED = "We've sent several confirmation links today — please use the newest email from CLAYSLAY, or try again tomorrow";
 
+/**
+ * Where to send the customer after confirming: a path on this site only (never "//other.site", "/\other", a full
+ * URL, an API route or the verification pages themselves). Anything else → null (the page picks a default).
+ */
+export function safeNext(next) {
+  const n = String(next ?? '');
+  if (!n || n.length > 300 || !/^\/(?![/\\])[A-Za-z0-9\-._~/?=&%:+,]*$/.test(n)) return null;
+  if (/^\/(api|verify-email|verify-pending)\b/i.test(n)) return null;
+  return n;
+}
+
 /** Store a new link for this user (only its hash) and return the raw link. Runs inside the caller's transaction, if any. */
-async function createLink(userId) {
+async function createLink(userId, next) {
   const token = randomToken(32);
   const { id } = await run(`INSERT INTO email_verifications(token_hash, user_id, expires_at) VALUES (?, ?, now() + ?::interval)`,
     sha256(token), userId, `${LINK_HOURS} hours`);
-  return { id, link: `${config.appUrl}/verify-email.html?token=${encodeURIComponent(token)}` };
+  const after = safeNext(next);
+  return { id, link: `${config.appUrl}/verify-email.html?token=${encodeURIComponent(token)}${after ? `&next=${encodeURIComponent(after)}` : ''}` };
 }
 
 /** Email the link after the response, outside any transaction (so it is only sent for a link that was committed). */
@@ -38,8 +50,8 @@ const sendInBackground = (user, { link, id }) =>
   detached(() => runInBackground(new Promise((r) => setImmediate(r)).then(() => sendVerification(user, link, id))));
 
 /** Create a link for this user and send it in the background. user = { id, email, name } */
-export async function issueVerification(user) {
-  sendInBackground(user, await createLink(user.id));
+export async function issueVerification(user, { next } = {}) {
+  sendInBackground(user, await createLink(user.id, next));
 }
 
 async function sendVerification(user, link, verificationId) {
@@ -90,19 +102,34 @@ export async function confirmVerification(token) {
 }
 
 /**
+ * For the "confirm your email" page: is the email confirmed, and has a link ever been issued for this account?
+ * Accounts created before email confirmation existed have never been sent one. Read-only — never sends anything.
+ */
+export async function verificationStatus(userId) {
+  const u = await one('SELECT email_verified_at FROM users WHERE id = ?', userId);
+  const link = await one('SELECT 1 AS yes FROM email_verifications WHERE user_id = ? LIMIT 1', userId);
+  return { emailVerified: Boolean(u?.email_verified_at), linkSent: Boolean(link) };
+}
+
+/**
  * "Send me a new link" for the signed-in customer: at most one a minute, and DAILY_LIMIT in any rolling 24 hours.
  * The account row is locked while checking and recording, so simultaneous requests are counted one after another
  * and can't slip past either limit. The email is sent only after the new link is committed.
  */
-export async function resendVerification(userId) {
+export async function resendVerification(userId, { next } = {}) {
   const out = await tx(async () => {
     const u = await one('SELECT id, email, name, email_verified_at FROM users WHERE id = ? FOR UPDATE', userId);
     if (u.email_verified_at) return { alreadyVerified: true };
-    const c = await one(`SELECT count(*)::int AS n, COALESCE(bool_or(created_at > now() - ?::interval), false) AS recent
-      FROM email_verifications WHERE user_id = ? AND created_at > now() - interval '24 hours'`, `${RESEND_COOLDOWN_SECONDS} seconds`, u.id);
-    if (c.recent) throw new HttpError(429, TOO_SOON);
-    if (c.n >= DAILY_LIMIT) throw new HttpError(429, DAILY_LIMIT_REACHED);
-    return { user: u, created: await createLink(u.id) };
+    // retryAfter (seconds) lets the page count down; it reveals nothing beyond this customer's own sending history.
+    const c = await one(`SELECT count(*)::int AS n,
+        COALESCE(bool_or(created_at > clock_timestamp() - ?::interval), false) AS recent,
+        CEIL(EXTRACT(EPOCH FROM (max(created_at) + ?::interval - clock_timestamp())))::int AS cooldown_left,
+        CEIL(EXTRACT(EPOCH FROM (min(created_at) + interval '24 hours' - clock_timestamp())))::int AS window_left
+      FROM email_verifications WHERE user_id = ? AND created_at > clock_timestamp() - interval '24 hours'`,
+    `${RESEND_COOLDOWN_SECONDS} seconds`, `${RESEND_COOLDOWN_SECONDS} seconds`, u.id);
+    if (c.recent) throw new HttpError(429, TOO_SOON, { cooldown: true, retryAfter: Math.max(1, c.cooldown_left || RESEND_COOLDOWN_SECONDS) });
+    if (c.n >= DAILY_LIMIT) throw new HttpError(429, DAILY_LIMIT_REACHED, { dailyLimit: true, retryAfter: Math.max(60, c.window_left || 86400) });
+    return { user: u, created: await createLink(u.id, next) };
   });
   if (out.alreadyVerified) return out;
   sendInBackground(out.user, out.created);

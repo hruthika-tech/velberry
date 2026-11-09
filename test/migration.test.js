@@ -197,7 +197,9 @@ test('the shop runs on the migrated data: migrated admin logs in, products show 
   assert.equal(login.status, 200, JSON.stringify(login.data));
   const cust = await c('POST', '/api/auth/login', { email: 'Mixed.Case@Example.com', password: 'customer-pass-1' });
   assert.equal(cust.status, 200, 'customer can log in with the same password (any email case)');
-  const p = await c('GET', '/api/products/cherry-twins');
+  assert.equal((await c('GET', '/api/products/cherry-twins')).status, 403, 'a migrated customer confirms their email before shopping');
+  assert.equal((await c('POST', '/api/auth/login', { email: 'owner@test.local', password: 'migrated-admin-pass' })).status, 200);
+  const p = await c('GET', '/api/products/cherry-twins'); // admins are never gated
   assert.equal(p.status, 200);
   const product = p.data.product || p.data;
   assert.equal(product.image, pubUrl('product-images', 'seed/cherry-twins-1.svg'));

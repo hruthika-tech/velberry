@@ -69,7 +69,8 @@ test('sign-up emails a branded confirmation link through Resend, from EMAIL_FROM
   assert.match(n.provider_id, /^re_/);
   // the site knows the account isn't confirmed yet
   assert.equal((await c('GET', '/api/config')).data.user.emailVerified, false);
-  assert.equal((await c('GET', '/api/account')).data.user.emailVerified, false);
+  const acct = await c('GET', '/api/account');
+  assert.deepEqual([acct.status, acct.data.details], [403, { verificationRequired: true }], 'the account area waits for confirmation');
 });
 
 test('opening the link confirms the account — even on a device that is not logged in — and works only once', async () => {
@@ -103,16 +104,23 @@ test('expired, unknown and malformed links are refused and confirm nothing', asy
   assert.equal(await verifiedAt(c.userId), null);
 });
 
-test('an unconfirmed customer can still log in and shop — confirmation is a reminder, not a wall', async () => {
+test('an unconfirmed customer can log in, but the boutique stays locked until the email is confirmed', async () => {
   const { c } = await signUp();
   const p = await one("SELECT * FROM products WHERE slug = 'cherry-twins'");
   await run('UPDATE products SET stock = GREATEST(stock, 50), sold_out = false WHERE id = ?', p.id);
   const add = await c('POST', '/api/cart/items', { productId: p.id, quantity: 1 });
-  assert.equal(add.status, 200, JSON.stringify(add.data));
-  assert.equal(add.data.count, 1);
+  assert.equal(add.status, 403, JSON.stringify(add.data));
+  assert.equal(add.data.details.verificationRequired, true);
   const login = await visitor()('POST', '/api/auth/login', { email: c.email, password: 'lovely-charms-1' });
   assert.equal(login.status, 200);
   assert.equal(login.data.user.emailVerified, false);
+  await settleBackground();
+  assert.equal(mailsTo(c.email).length, 1, 'logging in does not send another email');
+  // opening the link unlocks it
+  assert.equal((await visitor()('POST', '/api/auth/verify-email', { token: linkToken(mailsTo(c.email)[0]) })).status, 200);
+  const after = await c('POST', '/api/cart/items', { productId: p.id, quantity: 1 });
+  assert.equal(after.status, 200, JSON.stringify(after.data));
+  assert.equal(after.data.count, 1);
 });
 
 test('"send a new link": needs login, waits a minute between sends, and stops once confirmed', async () => {
@@ -186,8 +194,8 @@ test('Fix 1: signing up with an email that has past guest orders does NOT reveal
   const past = await pastOrder(email.toUpperCase()); // stored in a different case
   const c = await signUpAs(email);
   assert.equal(await ownerOf(past.id), null, 'still a guest order');
-  assert.deepEqual((await c('GET', '/api/account')).data.orders, []);
-  assert.equal((await c('GET', `/api/account/orders/${past.number}`)).status, 404);
+  assert.equal((await c('GET', '/api/account')).status, 403, 'unconfirmed: no account area at all');
+  assert.equal((await c('GET', `/api/account/orders/${past.number}`)).status, 403);
 });
 
 test('Fix 1: confirming the email links matching guest orders — never orders that belong to another account', async () => {

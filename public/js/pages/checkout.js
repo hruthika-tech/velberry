@@ -20,6 +20,7 @@ async function init() {
   config = await siteConfig;
   // Checkout is for signed-in customers (the server refuses every checkout call otherwise); come straight back after.
   if (!config.user) { location.replace(`/account.html?reason=checkout&next=${encodeURIComponent('/checkout.html')}`); return; }
+  if (!config.user.emailVerified && config.user.role !== 'admin') { location.replace(`/verify-pending.html?next=${encodeURIComponent('/checkout.html')}`); return; }
   const bag = await cart.load();
   if (!bag.items.length) {
     host.innerHTML = `<div class="panel stitched empty-state" style="max-width:520px;margin:0 auto 80px">${charmSVG('teacup', { size: 100 })}<h2>Your bag is empty</h2><a class="btn" href="/shop.html">Explore the Collection</a></div>`;

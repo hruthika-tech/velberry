@@ -7,7 +7,7 @@
 import { test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { setupTestEnv, makeClient, startApp, customer, address } from './helpers/env.js';
+import { setupTestEnv, makeClient, startApp, customer, address, confirmEmail } from './helpers/env.js';
 
 const env = await setupTestEnv('loginshop');
 const { one, run, closeDb } = await import('../server/db/index.js');
@@ -25,7 +25,7 @@ const product = async (slug = 'cherry-twins') => {
   await run('UPDATE products SET stock = GREATEST(stock, 50), sold_out = false WHERE id = ?', p.id);
   return p;
 };
-/** A customer who signed up through the real API. */
+/** A customer who signed up through the real API and opened the confirmation link (shopping needs a confirmed email). */
 async function signedUp(name = 'Asha') {
   const c = visitor();
   const email = `${name.toLowerCase()}-${crypto.randomBytes(4).toString('hex')}@example.com`;
@@ -33,18 +33,25 @@ async function signedUp(name = 'Asha') {
   assert.equal(r.status, 201, JSON.stringify(r.data));
   c.email = email;
   c.userId = (await one('SELECT id FROM users WHERE email = ?', email)).id;
+  await confirmEmail(c.userId);
   return c;
 }
 const rawFetch = (path, opts = {}) => fetch(app.base + path, opts);
 
 /* ───────── signed out ───────── */
 
-test('a signed-out visitor can browse everything public', async () => {
+test('a signed-out visitor sees the public pages only — the boutique asks them to log in first', async () => {
   const v = visitor();
   const p = await product();
-  for (const url of ['/api/products', `/api/products/${p.slug}`, '/api/categories', '/api/config']) assert.equal((await v('GET', url)).status, 200, url);
-  for (const page of ['/', '/shop.html', `/p/${p.slug}`, '/collection/strawberry', '/care.html', '/shipping.html', '/contact.html']) {
+  for (const url of ['/api/config', '/api/home']) assert.equal((await v('GET', url)).status, 200, url);
+  for (const url of ['/api/products', `/api/products/${p.slug}`, '/api/categories']) assert.equal((await v('GET', url)).status, 401, url);
+  for (const page of ['/', '/care.html', '/shipping.html', '/contact.html', '/track.html', `/share/product/${p.slug}`]) {
     assert.equal((await rawFetch(page)).status, 200, page);
+  }
+  for (const page of ['/shop.html', `/p/${p.slug}`, '/collection/strawberry']) {
+    const r = await rawFetch(page, { redirect: 'manual' });
+    assert.equal(r.status, 302, page);
+    assert.ok(r.headers.get('location').startsWith('/account.html?reason=browse&next='), page);
   }
 });
 

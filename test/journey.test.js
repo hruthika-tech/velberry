@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { setupTestEnv, makeClient, startApp, customer, address } from './helpers/env.js';
+import { setupTestEnv, makeClient, startApp, customer, address, confirmEmail } from './helpers/env.js';
 
 const env = await setupTestEnv('journey');
 const { one, run, closeDb } = await import('../server/db/index.js');
@@ -193,6 +193,8 @@ test('accounts: no guest bag (nothing added or merged before login), saved addre
   assert.equal(guestAdd.data.details.loginRequired, true);
   const s = await c('POST', '/api/auth/signup', { name: 'Meera', email: 'meera@example.com', password: 'lovely-charms' });
   assert.equal(s.status, 201);
+  assert.equal((await c('POST', '/api/cart/items', { productId: shell.id, quantity: 1 })).status, 403, 'not until the email is confirmed');
+  await confirmEmail('meera@example.com');
   assert.equal((await c('GET', '/api/cart')).data.count, 0, 'nothing was added or merged before login');
   await c('POST', '/api/cart/items', { productId: shell.id, quantity: 1 });
   assert.equal((await c('GET', '/api/cart')).data.count, 1, 'signed in: the charm goes into her own bag');
