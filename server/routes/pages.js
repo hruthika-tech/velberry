@@ -61,6 +61,8 @@ function head({ title, description, url, image, imageAlt, type = 'website', pric
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="only light">
+  <meta name="theme-color" content="#FFF8EE">
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
   ${robots ? `<meta name="robots" content="${robots}">` : ''}

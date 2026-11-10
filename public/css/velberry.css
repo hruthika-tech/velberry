@@ -39,7 +39,10 @@
   --chain-bottom-h: 0px;
   --wrap: 1180px;
 
-  color-scheme: light;
+  /* "only light": the design is light-only, so browsers must not auto-darken it (Samsung Internet / Chrome Android
+     "dark mode for websites" otherwise recolour the palette and tint the SVG product art). Plain "light" allows that.
+     Every page also carries <meta name="color-scheme" content="only light"> so this applies before the CSS loads. */
+  color-scheme: only light;
 }
 
 /* ───────── base ───────── */
